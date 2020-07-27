@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Column, ForeignKey, Integer, String, Float, Boolean
+from sqlalchemy import Column, ForeignKey, Integer, String, Float, Boolean, event
 
 from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine
@@ -10,15 +10,18 @@ class Login(db.Model):
     __tablename__ = 'Login'
     id = Column(Integer, primary_key=True)
     name = Column(String(50), unique=True)
+    email = Column(String(50), unique=True)
 
     def __rep__(self):
         return "Login %r>" % self.name
 
     def serialize(self):
         return {
-            "id": self.id,
-            "login": self.name    
+            'id': self.id,
+            'name': self.name,
+            'email': self.email    
         }        
+
 
 class User(db.Model):
     __tablename__ = 'User'
@@ -38,6 +41,23 @@ class User(db.Model):
             'login': self.login.serialize()  
         }        
 
+class Region(db.Model):
+    __tablename__ = 'Region'
+    id = Column(Integer, primary_key=True)
+    code = Column(String(2), nullable = False)
+    name = Column(String(100), nullable = False)
+
+    def __rep__(self):
+        return "Region %r>" % self.name
+
+    def serialize(self):
+        return {
+            'id': self.id,
+            'code': self.code,
+            'name': self.name
+        }        
+
+
 class UserStore(db.Model):
     __tablename__ = 'UserStore'
     id = Column(Integer, primary_key=True)
@@ -45,6 +65,10 @@ class UserStore(db.Model):
     
     userId = Column(Integer, ForeignKey('User.id'))
     user = relationship(User)
+
+    regionId = Column(Integer, ForeignKey('Region.id'))
+    region = relationship(Region)
+
     def __rep__(self):
         return "UserStore %r>" % self.name
 
@@ -52,7 +76,8 @@ class UserStore(db.Model):
         return {
             'id': self.id,
             'name': self.name ,
-            'user': self.user.serialize() 
+            'user': self.user.serialize(),
+            'region': self.region.serialize()
         }        
 
 class Department(db.Model):
@@ -82,9 +107,6 @@ class Category(db.Model):
             "id": self.id,
             "name": self.name    
         }   
-
-
-
 
 class Size(db.Model):
     __tablename__ = 'Size'
@@ -127,8 +149,6 @@ class WeightUnit(db.Model):
             "id": self.id,
             "name": self.name    
         }   
-
-
 
 class Product(db.Model):
     __tablename__= 'Product'
@@ -193,4 +213,5 @@ class Product(db.Model):
             'productState': self.productState.serialize(),
             'weightUnit': self.weightUnit.serialize()
 
-        }        
+        }   
+
