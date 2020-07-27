@@ -137,6 +137,7 @@ class Product(db.Model):
     name = Column(String(50), nullable = False)
     price = Column(Float,nullable = False)
     originalPrice = Column(Float, nullable = False)
+    flete = Column(Float, nullable = False)
     hasBrand = Column(Boolean, nullable = False)
     brand = Column(String(50))
     color = Column(String(50))
@@ -183,6 +184,7 @@ class Product(db.Model):
             'model': self.model,
             'weight': self.weight,
             'qty': self.qty,
+            'flete': self.flete,
             'photos': [self.urlPhoto1,self.urlPhoto2,self.urlPhoto3,self.urlPhoto4,self.urlPhoto5],
             'category': self.category.serialize(),
             'userStore': self.userStore.serialize(),

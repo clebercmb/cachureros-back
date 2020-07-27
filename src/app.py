@@ -327,6 +327,7 @@ def product_9post(user_id=None):
     qty = request.json.get('qty',None)
     weight = request.json.get('weight',None)
     photos = request.json.get('photos',None)
+    flete = request.json.get('flete',None)
     urlPhoto1 = photos[0]
     urlPhoto2 = photos[1]
     urlPhoto3 = photos[2]
@@ -339,7 +340,7 @@ def product_9post(user_id=None):
     productStateId = request.json.get('productStateId')
     weightUnitId = request.json.get('weightUnitId')
 
-    print('userStoreId=', userStoreId, 'name=', name, 'brand=', brand, 'model=', model, 'color=', color, 'hasBrand=', hasBrand,'price=', price, 'originalPrice=', originalPrice, 'qty=', qty,  'weight=', weight, 'urlPhoto1=', urlPhoto1, 'urlPhoto2=', urlPhoto2, 'urlPhoto3=', urlPhoto3, 'urlPhoto4=', urlPhoto4, 'urlPhoto5=', urlPhoto5, 'userStoreId=', userStoreId, 'departmentId=', departmentId, 'categoryId=', categoryId, 'sizeId=',sizeId, 'productStateId=', productStateId, 'weightUnitId=', weightUnitId)
+    print('userStoreId=', userStoreId, 'name=', name, 'brand=', brand, 'model=', model, 'color=', color, 'hasBrand=', hasBrand,'price=', price, 'originalPrice=', originalPrice, 'qty=', qty,  'weight=', weight, 'flete=', flete,'urlPhoto1=', urlPhoto1, 'urlPhoto2=', urlPhoto2, 'urlPhoto3=', urlPhoto3, 'urlPhoto4=', urlPhoto4, 'urlPhoto5=', urlPhoto5, 'userStoreId=', userStoreId, 'departmentId=', departmentId, 'categoryId=', categoryId, 'sizeId=',sizeId, 'productStateId=', productStateId, 'weightUnitId=', weightUnitId)
 
     if not userStoreId:
         return jsonify({"msg":"userStoreId is required"}), 422
@@ -356,16 +357,19 @@ def product_9post(user_id=None):
     if not color:
         return jsonify({"msg":"color is required"}), 422
 
-    if not price:
+    if price is None:
         return jsonify({"msg":"price is required"}), 422
 
-    if not originalPrice:
+    if originalPrice is None:
         return jsonify({"msg":"originalPrice is required"}), 422
+
+    if flete is None:
+        return jsonify({"msg":"flete is required"}), 422
 
     if not qty:
         return jsonify({"msg":"qty is required"}), 422
 
-    if not weight:
+    if weight is None:
         return jsonify({"msg":"weight is required"}), 422   
 
     if not urlPhoto1:
@@ -409,6 +413,7 @@ def product_9post(user_id=None):
     product.originalPrice = originalPrice
     product.qty = qty
     product.weight = weight
+    product.flete = flete
     product.photos = photos
     product.urlPhoto1 = urlPhoto1
     product.urlPhoto2 = urlPhoto2
