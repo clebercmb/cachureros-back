@@ -2,10 +2,12 @@ import os
 from flask import Flask, request, jsonify, url_for
 from flask_script import Manager 
 from flask_migrate import Migrate, MigrateCommand
-from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, WeightUnit
+from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, WeightUnit, Region
 from flask_cors import CORS
 from utils import APIException, generate_sitemap
 from graphene import ObjectType, String, Schema
+from sqlalchemy import event
+from sqlalchemy.event import listen
 
 
 app = Flask(__name__)
@@ -269,6 +271,40 @@ def addProductState():
     db.session.commit()
     return jsonify(productState.serialize()),201
 
+# Region
+@app.route('/region', methods=['GET'])
+def getRegion():
+    print("** getRegion **")
+    regions = Region.query.all()
+    regionsList = list(map( lambda region: region.serialize(), regions ))
+    return jsonify(regionsList), 200
+
+
+@app.route("/region", methods=['POST'])  
+def addRegion():
+    print('***addRegion***')
+    print(request.json)    
+
+    code = request.json.get('code',None)
+    name = request.json.get('name',None)
+
+    print('name=', name, 'code=',code)
+
+    if not code:
+        return jsonify({"msg":"code is required"}), 422
+
+    if not name:
+        return jsonify({"msg":"name is required"}), 422
+
+    region = Region()
+    region.code = code
+    region.name = name
+    
+    db.session.add(region)
+    db.session.commit()
+    return jsonify(region.serialize()),201
+
+
 # WeightUnit
 @app.route('/weightunit', methods=['GET'])
 def getWeightUnit():
@@ -435,10 +471,61 @@ def product_9post(user_id=None):
 # generate sitemap with all your endpoints
 @app.route('/')
 def sitemap():
-    return generate_sitemap(app)
+    db.session.add(Region(code='01', name='Tarapac\u00e1'))
+    db.session.add(Region(code='02', name='Antofagasta'))
+    db.session.add(Region(code='03', name='Atacama'))
+    db.session.add(Region(code='04', name='Coquimbo'))
+    db.session.add(Region(code='05', name='Valparaíso'))
+    db.session.add(Region(code='06', name='O\u2019Higgins'))
+    db.session.add(Region(code='07', name='Maule'))
+    db.session.add(Region(code='08', name='Biob\u00edo'))
+    db.session.add(Region(code='09', name='Araucan\u00eda'))
+    db.session.add(Region(code='10', name='Los Lagos'))
+    db.session.add(Region(code='11', name='Ays\u00e9n'))
+    db.session.add(Region(code='12', name='Magallanes'))
+    db.session.add(Region(code='13', name='Metropolitana de Santiago'))
+    db.session.add(Region(code='14', name='Los R\u00edos'))
+    db.session.add(Region(code='15', name='Arica y Parinacota'))
+    db.session.add(Region(code='16', name='\u00d1uble'))
+
+    db.session.add(Department(name='Hogar'))
+    db.session.add(Department(name='Ropa'))
+    db.session.add(Department(name='Calzado'))
+    db.session.add(Department(name='Informática'))
+    db.session.add(Department(name='Electrodomésticos'))
+    db.session.add(Department(name='Etc y Tal'))
+
+    db.session.add(Login(name='Login 1', email='juanita@gmail.com'))
+    db.session.add(User(name='User 1', loginId=1)) 
+    db.session.add(UserStore(name='UserStore 1', regionId=13, userId=1))  
+
+    db.session.add(Category(name='Chicos'))
+    db.session.add(Category(name='Chicas'))
+    
+    db.session.add(Size(name='P'))
+    db.session.add(Size(name='M'))
+    db.session.add(Size(name='G'))
+
+    db.session.add(ProductState(name='Nuevo'))
+    db.session.add(ProductState(name='Usado'))
+
+    db.session.add(WeightUnit(name='KG'))
+    db.session.add(WeightUnit(name='gm'))
+
+    db.session.commit()
+
+    return 'Tables filled'
 
 #if __name__ == '__main__':
 #    app.run(port=3245, debug=True)
+
+# second solution
+#def insert_initial_values(*args, **kwargs):
+#    db.session.add(Region(code='01', name='low'))
+#    db.session.commit()
+
+
+
 
 if __name__ == "__main__":
     manager.run()
