@@ -95,18 +95,31 @@ def addUser():
 @app.route('/user-store', methods=['GET'])
 def getUserStore():
     print("** getUserStore.request.method===>" +  request.method)
-    userStores = UserStore.query.all()
-    userStoresList = list(map( lambda userStore: userStore.serialize(), userStores ))
-    return jsonify(userStoresList), 200
+    userStoreList = UserStore.getAllUserStores()
+    return jsonify(userStoreList), 200
+
+@app.route('/user-store/<int:id>', methods=['GET'])
+def getUserStoreById(id):
+    print("** getUserStore(id).request.method===>" ,  request.method)
+    userStore = UserStore.getOneUserStoreById(id)
+
+    print("** getUserStore(id).userStoreList=",userStore) 
+
+    if userStore:
+        return jsonify(userStore.serialize_with_product()), 200
+    else:
+        return jsonify({"msg":"UserStore not found"}), 404
 
 
 @app.route("/user-store", methods=['POST'])  
 def addUserStoreId():
     print('***addUserStoreId***')
-    print(request.json)    
+    data = request.json
+    print(data)    
 
     name = request.json.get('name',None)
     userId = request.json.get('userId',None)
+    regionId = request.json.get('regionId', None)
  
 
     print('name=', name, 'userId=', userId)
@@ -117,12 +130,16 @@ def addUserStoreId():
     if not userId:
         return jsonify({"msg":"userId is required"}), 422
 
-    userStore = UserStore()
-    userStore.name = name
-    userStore.userId = userId
+    if not regionId:
+        return jsonify({"msg":"regionId is required"}), 422
+
+    userStore = UserStore(name, userId, regionId)
+    #userStore.name = name
+    #userStore.userId = userId
+    #userStore.regionId = regionId
     
-    db.session.add(userStore)
-    db.session.commit()
+    userStore.save()
+
     return jsonify(userStore.serialize()),201
 
 # Department

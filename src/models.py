@@ -1,8 +1,9 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Column, ForeignKey, Integer, String, Float, Boolean, event
+from sqlalchemy import Column, ForeignKey, Integer, String, Float, Boolean, event, DateTime
 
 from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine
+import datetime
 
 db = SQLAlchemy()
 
@@ -69,6 +70,23 @@ class UserStore(db.Model):
     regionId = Column(Integer, ForeignKey('Region.id'))
     region = relationship(Region)
 
+    createdAt = db.Column(DateTime)
+    modifiedAt  = db.Column(DateTime)
+
+    products = relationship("Product", backref="UserStore", lazy=True, uselist=False)
+
+    # class constructor
+    def __init__(self, name, userId, regionId):
+        """
+        Class constructor
+        """
+        self.name = name
+        self.userId = userId
+        self.regionId = regionId
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
+
     def __rep__(self):
         return "UserStore %r>" % self.name
 
@@ -77,8 +95,48 @@ class UserStore(db.Model):
             'id': self.id,
             'name': self.name ,
             'user': self.user.serialize(),
-            'region': self.region.serialize()
-        }        
+            'region': self.region.serialize(),
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt
+        }  
+
+    def serialize_with_product(self):
+        print('****UserStore.serialize_with_product.products:', self.products.query.all())
+        products = list(map(lambda product: product.serialize(), self.products.query.all()))
+        return {
+            'id': self.id,
+            'name': self.name ,
+            'user': self.user.serialize(),
+            'region': self.region.serialize(),
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt,
+            'products':products
+        }  
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getAllUserStores():
+        userStores = list(map(lambda userStore: userStore.serialize(), UserStore.query.all() ))
+        print('****models.userStores=',userStores)
+        return userStores
+
+    @staticmethod
+    def getOneUserStoreById(id):
+        return UserStore.query.get(id)
+    
+
+
 
 class Department(db.Model):
     __tablename__ = 'Department'
