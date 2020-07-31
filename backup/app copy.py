@@ -2,7 +2,7 @@ import os
 from flask import Flask, request, jsonify, url_for
 from flask_script import Manager 
 from flask_migrate import Migrate, MigrateCommand
-from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, WeightUnit, Region
+from models import db, ma, Product, UserStore, Login, User, Department, Category, Size, ProductState, WeightUnit, Region
 from flask_cors import CORS
 from utils import APIException, generate_sitemap
 from graphene import ObjectType, String, Schema
@@ -20,6 +20,7 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(BASE_DIR, "d
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
+ma.init_app(app)
 
 CORS(app)
 Migrate(app,db)
@@ -95,31 +96,19 @@ def addUser():
 @app.route('/user-store', methods=['GET'])
 def getUserStore():
     print("** getUserStore.request.method===>" +  request.method)
-    userStoreList = UserStore.getAllUserStores()
-    return jsonify(userStoreList), 200
-
-@app.route('/user-store/<int:id>', methods=['GET'])
-def getUserStoreById(id):
-    print("** getUserStore(id).request.method===>" ,  request.method)
-    userStore = UserStore.getOneUserStoreById(id)
-
-    print("** getUserStore(id).userStoreList=",userStore) 
-
-    if userStore:
-        return jsonify(userStore.serialize_with_product()), 200
-    else:
-        return jsonify({"msg":"UserStore not found"}), 404
+    userStores = UserStore.get_all_userStores() #UserStore.query.all()
+    print(">>getUserStore=",UserStore.query.first().name)
+    #userStoresList = list(map( lambda userStore: userStore.serialize(), userStores ))
+    return jsonify(userStores), 200
 
 
 @app.route("/user-store", methods=['POST'])  
 def addUserStoreId():
     print('***addUserStoreId***')
-    data = request.json
-    print(data)    
+    print(request.json)    
 
     name = request.json.get('name',None)
     userId = request.json.get('userId',None)
-    regionId = request.json.get('regionId', None)
  
 
     print('name=', name, 'userId=', userId)
@@ -130,16 +119,12 @@ def addUserStoreId():
     if not userId:
         return jsonify({"msg":"userId is required"}), 422
 
-    if not regionId:
-        return jsonify({"msg":"regionId is required"}), 422
-
-    userStore = UserStore(name, userId, regionId)
-    #userStore.name = name
-    #userStore.userId = userId
-    #userStore.regionId = regionId
+    userStore = UserStore()
+    userStore.name = name
+    userStore.userId = userId
     
-    userStore.save()
-
+    db.session.add(userStore)
+    db.session.commit()
     return jsonify(userStore.serialize()),201
 
 # Department

@@ -1,11 +1,12 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Column, ForeignKey, Integer, String, Float, Boolean, event, DateTime
+from sqlalchemy import Column, ForeignKey, Integer, String, Float, Boolean, event
 
 from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine
-import datetime
+from flask_marshmallow import Marshmallow
 
 db = SQLAlchemy()
+ma = Marshmallow()
 
 class Login(db.Model):
     __tablename__ = 'Login'
@@ -70,73 +71,40 @@ class UserStore(db.Model):
     regionId = Column(Integer, ForeignKey('Region.id'))
     region = relationship(Region)
 
-    createdAt = db.Column(DateTime)
-    modifiedAt  = db.Column(DateTime)
-
-    products = relationship("Product", backref="UserStore", lazy=True, uselist=False)
-
-    # class constructor
-    def __init__(self, name, userId, regionId):
-        """
-        Class constructor
-        """
-        self.name = name
-        self.userId = userId
-        self.regionId = regionId
-        self.createdAt = datetime.datetime.utcnow()
-        self.modifiedAt = datetime.datetime.utcnow()
+    #products = relationship("Product", backref="UserStore", lazy=True, uselist=False)
 
 
     def __rep__(self):
         return "UserStore %r>" % self.name
 
-    def serialize(self):
-        return {
-            'id': self.id,
-            'name': self.name ,
-            'user': self.user.serialize(),
-            'region': self.region.serialize(),
-            'createdAt': self.createdAt,
-            'modifiedAt': self.modifiedAt
-        }  
 
-    def serialize_with_product(self):
-        print('****UserStore.serialize_with_product.products:', self.products.query.all())
-        products = list(map(lambda product: product.serialize(), self.products.query.all()))
-        return {
-            'id': self.id,
-            'name': self.name ,
-            'user': self.user.serialize(),
-            'region': self.region.serialize(),
-            'createdAt': self.createdAt,
-            'modifiedAt': self.modifiedAt,
-            'products':products
-        }  
 
-    def save(self):
-        db.session.add(self)
-        db.session.commit()
-
-    def update(self):
-        self.modifiedAt = datetime.datetime.utcnow()
-        db.commit()
-
-    def delete(self):
-        db.session.delete(self)
-        db.session.commit()
-
+#    def serialize(self):
+##        class UserStoreSchema(ma.SQLAlchemySchema):
+##            class Meta:
+#                model = UserStore
+#        userStoreSchema = UserStoreSchema()
+#        return userStoreSchema.dump(self).data     
+           
     @staticmethod
-    def getAllUserStores():
-        userStores = list(map(lambda userStore: userStore.serialize(), UserStore.query.all() ))
+    def get_all_userStores():
+        class UserStoreSchema(ma.Schema):
+            class Meta:
+                fields = ("id", "name", "products")
+
+        userStores = UserStore.query.all()
         print('****models.userStores=',userStores)
-        return userStores
-
-    @staticmethod
-    def getOneUserStoreById(id):
-        return UserStore.query.get(id)
-    
-
-
+        userStoreSchema = UserStoreSchema(many=True)
+        ser_userStores = userStoreSchema.dump(userStores)
+        print('*ser_userStores=', ser_userStores)
+        return ser_userStores
+#    def serialize(self):
+#        return {
+#            'id': self.id,
+#            'name': self.name ,
+#            'user': self.user.serialize(),
+#            'region': self.region.serialize()
+#        }        
 
 class Department(db.Model):
     __tablename__ = 'Department'
