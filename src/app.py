@@ -2,10 +2,9 @@ import os
 from flask import Flask, request, jsonify, url_for
 from flask_script import Manager 
 from flask_migrate import Migrate, MigrateCommand
-from models import db, Product, UserStore, Login, User, Department, Category, SubCategory, Size, ProductState, Cart, CartProduct, WeightUnit, Region
+from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, Cart, CartProduct, WeightUnit, Region, Follow
 from flask_cors import CORS
 from utils import APIException, generate_sitemap
-from graphene import ObjectType, String, Schema
 from sqlalchemy import event
 from sqlalchemy.event import listen
 
@@ -66,6 +65,15 @@ def getUser():
     print("** getUser **")
     users = User.query.all()
     usersList = list(map( lambda user: user.serialize(), users ))
+    print('usersList=', usersList)
+    return jsonify(usersList), 200
+
+
+@app.route('/user-follow', methods=['GET'])
+def getUserFollow():
+    print("** getUser **")
+    users = User.query.all()
+    usersList = list(map( lambda user: user.serialize_with_follow(), users ))
     print('usersList=', usersList)
     return jsonify(usersList), 200
 
@@ -141,6 +149,44 @@ def addUserStoreId():
     userStore.save()
 
     return jsonify(userStore.serialize()),201
+
+
+#Follower
+@app.route('/followed/<int:id>', methods=['GET'])
+def getFollowedByUserId(id):
+    print("** getFollowedByUserId(id).request.method===>" ,  request.method)
+    followed = Follower.getAllFollower()
+    print("** getFollowedByUserId(id).followed=",followed) 
+
+    #if userStore:
+    #    return jsonify(userStore.serialize_with_product()), 200
+    #else:
+    #    return jsonify({"msg":"UserStore not found"}), 404
+
+
+@app.route("/follower", methods=['POST'])  
+def addFollower():
+    print('***addFollower***')
+    data = request.json
+    print(data)    
+
+    followerId = request.json.get('followerId',None)
+    followedId = request.json.get('followedId',None)
+
+    print('followerId=', followerId, 'followedId=', followedId)
+
+    if not followerId:
+        return jsonify({"msg":"followerId is required"}), 422
+
+    if not followedId:
+        return jsonify({"msg":"followedId is required"}), 422
+
+    follower = Follower(followerId, followedId)
+    
+    follower.save()
+
+    return jsonify(follower.serialize()),201
+
 
 # Department
 @app.route('/department', methods=['GET'])
@@ -591,8 +637,25 @@ def sitemap():
     db.session.add(Department(name='Etc y Tal'))
 
     db.session.add(Login(name='Login 1', email='juanita@gmail.com'))
-    db.session.add(User(name='User 1', loginId=1)) 
-    db.session.add(UserStore(name='UserStore 1', regionId=13, userId=1))  
+    user1 = User(name='User 1', loginId=1)
+    user1.save()
+    db.session.add(UserStore(name='UserStore 1', regionId=13, userId=1, title='Title', bio='Bio', url='juanita', photoUrl='/images/juanita.jpg'))  
+
+    db.session.add(Login(name='Login 2', email='juan@gmail.com'))
+    user2 = User(name='User 2', loginId=2)
+    user2.save() 
+    db.session.add(UserStore(name='UserStore 2', regionId=13, userId=2, title='Title', bio='Bio', url='juan', photoUrl='/images/juanita.jpg'))  
+
+    db.session.add(Login(name='Login 3', email='pablo@gmail.com'))
+    user3 = User(name='User 3', loginId=3)
+    user3.save() 
+    db.session.add(UserStore(name='UserStore 3', regionId=13, userId=3, title='Title', bio='Bio', url='pablo', photoUrl='/images/juanita.jpg'))  
+
+    user1.follow(user2)
+    user1.follow(user3)
+    user3.follow(user2)
+    #db.session.add(Follower(followerId=1, followedId=4))  
+    #db.session.add(Follower(followerId=1, followedId=5))
 
     db.session.add(Category(name='Chicos'))
     db.session.add(Category(name='Chicas'))
