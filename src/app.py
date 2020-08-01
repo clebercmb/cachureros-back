@@ -2,9 +2,13 @@ import os
 from flask import Flask, request, jsonify, url_for
 from flask_script import Manager 
 from flask_migrate import Migrate, MigrateCommand
-from models import db, Product, UserStore, Login, User, Department, Category, SubCategory, Size, ProductState, Cart, CartProduct
+from models import db, Product, UserStore, Login, User, Department, Category, SubCategory, Size, ProductState, Cart, CartProduct, WeightUnit, Region
 from flask_cors import CORS
 from utils import APIException, generate_sitemap
+from graphene import ObjectType, String, Schema
+from sqlalchemy import event
+from sqlalchemy.event import listen
+
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
@@ -91,18 +95,31 @@ def addUser():
 @app.route('/user-store', methods=['GET'])
 def getUserStore():
     print("** getUserStore.request.method===>" +  request.method)
-    userStores = UserStore.query.all()
-    userStoresList = list(map( lambda userStore: userStore.serialize(), userStores ))
-    return jsonify(userStoresList), 200
+    userStoreList = UserStore.getAllUserStores()
+    return jsonify(userStoreList), 200
+
+@app.route('/user-store/<int:id>', methods=['GET'])
+def getUserStoreById(id):
+    print("** getUserStore(id).request.method===>" ,  request.method)
+    userStore = UserStore.getOneUserStoreById(id)
+
+    print("** getUserStore(id).userStoreList=",userStore) 
+
+    if userStore:
+        return jsonify(userStore.serialize_with_product()), 200
+    else:
+        return jsonify({"msg":"UserStore not found"}), 404
 
 
 @app.route("/user-store", methods=['POST'])  
 def addUserStoreId():
     print('***addUserStoreId***')
-    print(request.json)    
+    data = request.json
+    print(data)    
 
     name = request.json.get('name',None)
     userId = request.json.get('userId',None)
+    regionId = request.json.get('regionId', None)
  
 
     print('name=', name, 'userId=', userId)
@@ -113,12 +130,16 @@ def addUserStoreId():
     if not userId:
         return jsonify({"msg":"userId is required"}), 422
 
-    userStore = UserStore()
-    userStore.name = name
-    userStore.userId = userId
+    if not regionId:
+        return jsonify({"msg":"regionId is required"}), 422
+
+    userStore = UserStore(name, userId, regionId)
+    #userStore.name = name
+    #userStore.userId = userId
+    #userStore.regionId = regionId
     
-    db.session.add(userStore)
-    db.session.commit()
+    userStore.save()
+
     return jsonify(userStore.serialize()),201
 
 # Department
@@ -267,6 +288,67 @@ def addProductState():
     db.session.commit()
     return jsonify(productState.serialize()),201
 
+# Region
+@app.route('/region', methods=['GET'])
+def getRegion():
+    print("** getRegion **")
+    regions = Region.query.all()
+    regionsList = list(map( lambda region: region.serialize(), regions ))
+    return jsonify(regionsList), 200
+
+
+@app.route("/region", methods=['POST'])  
+def addRegion():
+    print('***addRegion***')
+    print(request.json)    
+
+    code = request.json.get('code',None)
+    name = request.json.get('name',None)
+
+    print('name=', name, 'code=',code)
+
+    if not code:
+        return jsonify({"msg":"code is required"}), 422
+
+    if not name:
+        return jsonify({"msg":"name is required"}), 422
+
+    region = Region()
+    region.code = code
+    region.name = name
+    
+    db.session.add(region)
+    db.session.commit()
+    return jsonify(region.serialize()),201
+
+
+# WeightUnit
+@app.route('/weightunit', methods=['GET'])
+def getWeightUnit():
+    print("** getWeightUnit **")
+    weightUnits = WeightUnit.query.all()
+    weightUnitsList = list(map( lambda weightUnit: weightUnit.serialize(), weightUnits ))
+    return jsonify(weightUnitsList), 200
+
+
+@app.route("/weightunit", methods=['POST'])  
+def addWeightUnit():
+    print('***addWeightUnit***')
+    print(request.json)    
+
+    name = request.json.get('name',None)
+
+    print('name=', name)
+
+    if not name:
+        return jsonify({"msg":"name is required"}), 422
+
+    weightUnit = WeightUnit()
+    weightUnit.name = name
+    
+    db.session.add(weightUnit)
+    db.session.commit()
+    return jsonify(weightUnit.serialize()),201
 
 
 # Product
@@ -294,12 +376,11 @@ def product_9post(user_id=None):
     color = request.json.get('brand',None)
     hasBrand = request.json.get('hasBrand',None)
     price = request.json.get('price',None)
-    condition = request.json.get('condition',None)
     originalPrice = request.json.get('originalPrice',None)
     qty = request.json.get('qty',None)
     weight = request.json.get('weight',None)
-    weightUnit = request.json.get('weightUnit',None)
     photos = request.json.get('photos',None)
+    flete = request.json.get('flete',None)
     urlPhoto1 = photos[0]
     urlPhoto2 = photos[1]
     urlPhoto3 = photos[2]
@@ -308,11 +389,11 @@ def product_9post(user_id=None):
 
     departmentId = request.json.get('departmentId')
     categoryId = request.json.get('categoryId')
-    subCategoryId = request.json.get('subCategoryId')
     sizeId = request.json.get('sizeId')
     productStateId = request.json.get('productStateId')
+    weightUnitId = request.json.get('weightUnitId')
 
-    print('userStoreId=', userStoreId, 'name=', name, 'brand=', brand, 'model=', model, 'color=', color, 'hasBrand=', hasBrand,'price=', price, 'condition=', condition, 'originalPrice=', originalPrice, 'qty=', qty,  'weight=', weight, 'weightUnit=', weightUnit, 'urlPhoto1=', urlPhoto1, 'urlPhoto2=', urlPhoto2, 'urlPhoto3=', urlPhoto3, 'urlPhoto4=', urlPhoto4, 'urlPhoto5=', urlPhoto5, 'userStoreId=', userStoreId, 'departmentId=', departmentId, 'categoryId=', categoryId, 'subCategoryId=', subCategoryId, 'sizeId=',sizeId, 'productStateId=', productStateId)
+    print('userStoreId=', userStoreId, 'name=', name, 'brand=', brand, 'model=', model, 'color=', color, 'hasBrand=', hasBrand,'price=', price, 'originalPrice=', originalPrice, 'qty=', qty,  'weight=', weight, 'flete=', flete,'urlPhoto1=', urlPhoto1, 'urlPhoto2=', urlPhoto2, 'urlPhoto3=', urlPhoto3, 'urlPhoto4=', urlPhoto4, 'urlPhoto5=', urlPhoto5, 'userStoreId=', userStoreId, 'departmentId=', departmentId, 'categoryId=', categoryId, 'sizeId=',sizeId, 'productStateId=', productStateId, 'weightUnitId=', weightUnitId)
 
     if not userStoreId:
         return jsonify({"msg":"userStoreId is required"}), 422
@@ -329,23 +410,20 @@ def product_9post(user_id=None):
     if not color:
         return jsonify({"msg":"color is required"}), 422
 
-    if not price:
+    if price is None:
         return jsonify({"msg":"price is required"}), 422
 
-    if not condition:
-        return jsonify({"msg":"condition is required"}), 422
-
-    if not originalPrice:
+    if originalPrice is None:
         return jsonify({"msg":"originalPrice is required"}), 422
+
+    if flete is None:
+        return jsonify({"msg":"flete is required"}), 422
 
     if not qty:
         return jsonify({"msg":"qty is required"}), 422
 
-    if not weight:
+    if weight is None:
         return jsonify({"msg":"weight is required"}), 422   
-
-    if not weightUnit:
-        return jsonify({"msg":"weightUnit is required"}), 422
 
     if not urlPhoto1:
         return jsonify({"msg":"urlPhoto1 is required"}), 422   
@@ -353,7 +431,7 @@ def product_9post(user_id=None):
     if not urlPhoto2:
         return jsonify({"msg":"urlPhoto2 is required"}), 422   
 
-    if urlPhoto3 is None :
+    if not urlPhoto3:
         return jsonify({"msg":"urlPhoto3 is required"}), 422   
 
     if not urlPhoto4:
@@ -367,9 +445,6 @@ def product_9post(user_id=None):
 
     if not categoryId:
         return jsonify({"msg":"categoryId is required"}), 422
-
-    if not subCategoryId:
-        return jsonify({"msg":"subCategoryId is required"}), 422
     
     if not sizeId:
         return jsonify({"msg":"sizeId is required"}), 422
@@ -377,6 +452,8 @@ def product_9post(user_id=None):
     if not productStateId:
         return jsonify({"msg":"productStateId is required"}), 422
 
+    if not weightUnitId:
+        return jsonify({"msg":"weightUnitId is required"}), 422
 
     product = Product()
     product.userStoreId = userStoreId
@@ -386,11 +463,10 @@ def product_9post(user_id=None):
     product.color = color
     product.hasBrand = hasBrand
     product.price = price
-    product.condition = condition
     product.originalPrice = originalPrice
     product.qty = qty
     product.weight = weight
-    product.weightUnit = weightUnit
+    product.flete = flete
     product.photos = photos
     product.urlPhoto1 = urlPhoto1
     product.urlPhoto2 = urlPhoto2
@@ -400,9 +476,9 @@ def product_9post(user_id=None):
     
     product.departmentId = departmentId
     product.categoryId = categoryId
-    product.subCategoryId = subCategoryId
     product.sizeId = sizeId
     product.productStateId = productStateId
+    product.weightUnitId = weightUnitId
 
     db.session.add(product)
     db.session.commit()
@@ -490,10 +566,61 @@ def addCartProduct(user_id):
 # generate sitemap with all your endpoints
 @app.route('/')
 def sitemap():
-    return generate_sitemap(app)
+    db.session.add(Region(code='01', name='Tarapac\u00e1'))
+    db.session.add(Region(code='02', name='Antofagasta'))
+    db.session.add(Region(code='03', name='Atacama'))
+    db.session.add(Region(code='04', name='Coquimbo'))
+    db.session.add(Region(code='05', name='Valparaíso'))
+    db.session.add(Region(code='06', name='O\u2019Higgins'))
+    db.session.add(Region(code='07', name='Maule'))
+    db.session.add(Region(code='08', name='Biob\u00edo'))
+    db.session.add(Region(code='09', name='Araucan\u00eda'))
+    db.session.add(Region(code='10', name='Los Lagos'))
+    db.session.add(Region(code='11', name='Ays\u00e9n'))
+    db.session.add(Region(code='12', name='Magallanes'))
+    db.session.add(Region(code='13', name='Metropolitana de Santiago'))
+    db.session.add(Region(code='14', name='Los R\u00edos'))
+    db.session.add(Region(code='15', name='Arica y Parinacota'))
+    db.session.add(Region(code='16', name='\u00d1uble'))
+
+    db.session.add(Department(name='Hogar'))
+    db.session.add(Department(name='Ropa'))
+    db.session.add(Department(name='Calzado'))
+    db.session.add(Department(name='Informática'))
+    db.session.add(Department(name='Electrodomésticos'))
+    db.session.add(Department(name='Etc y Tal'))
+
+    db.session.add(Login(name='Login 1', email='juanita@gmail.com'))
+    db.session.add(User(name='User 1', loginId=1)) 
+    db.session.add(UserStore(name='UserStore 1', regionId=13, userId=1))  
+
+    db.session.add(Category(name='Chicos'))
+    db.session.add(Category(name='Chicas'))
+    
+    db.session.add(Size(name='P'))
+    db.session.add(Size(name='M'))
+    db.session.add(Size(name='G'))
+
+    db.session.add(ProductState(name='Nuevo'))
+    db.session.add(ProductState(name='Usado'))
+
+    db.session.add(WeightUnit(name='KG'))
+    db.session.add(WeightUnit(name='gm'))
+
+    db.session.commit()
+
+    return 'Tables filled'
 
 #if __name__ == '__main__':
 #    app.run(port=3245, debug=True)
+
+# second solution
+#def insert_initial_values(*args, **kwargs):
+#    db.session.add(Region(code='01', name='low'))
+#    db.session.commit()
+
+
+
 
 if __name__ == "__main__":
     manager.run()
