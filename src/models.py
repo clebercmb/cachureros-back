@@ -195,3 +195,44 @@ class Product(db.Model):
             'size': self.size.serialize(),
             'productState': self.productState.serialize()
         }        
+
+class Cart(db.Model):
+    __tablename__ = 'Cart'
+    id = Column(Integer, primary_key=True)
+
+    userId = Column(Integer, ForeignKey('User.id'))
+    user = relationship(User)
+
+    def __rep__(self):
+        return "Cart %r>" % self.id
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "User": self.user.serialize()
+        }   
+
+class CartProduct(db.Model):
+    __tablename__ = 'CartProduct'
+    id = Column(Integer, primary_key=True)
+    price = Column(Float)
+    amount = Column(Integer)
+
+    cartId = Column(Integer, ForeignKey('Cart.id'))
+    cart = relationship(Cart)
+
+    productId = Column(Integer, ForeignKey('Product.id'))
+    product = relationship(Product)
+
+    def __rep__(self):
+        return "CartProduct %r>" % self.id
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "price": self.price,
+            "amount": self.amount,
+            "Cart": self.cart.serialize(),
+            "Product": self.product.serialize()
+        }   
+
