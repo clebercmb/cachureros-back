@@ -1,7 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Column, ForeignKey, Integer, String, Float, Boolean, event, DateTime
 
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy import create_engine
 import datetime
 
@@ -23,6 +23,62 @@ class Login(db.Model):
             'email': self.email    
         }        
 
+class Follow(db.Model):
+    __tablename__ = 'Follow'
+
+    followerId = Column(Integer, ForeignKey('User.id'), primary_key = True )   
+    followedId = Column(Integer, ForeignKey('User.id'), primary_key = True)    
+
+    #follower = db.relationship(User, foreign_keys=[Follow.followerId])
+    #followed = db.relationship(User, foreign_keys=[Follow.followedId])
+
+    #followers = db.relationship(Follow, foreign_keys=[Follow.followedId], backref=db.backref('followed', lazy='joined'),lazy='dynamic', cascade='all, delete-orphan')
+
+
+    createdAt = Column(DateTime)
+    modifiedAt  = Column(DateTime)
+
+    # class constructor
+    def __init__(self, follower, followed):
+        """
+        Class constructor
+        """
+        self.followerId = follower.id
+        self.followedId = followed.id
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
+    def __rep__(self):
+        return "Follower %r>" % self.id
+
+    def serialize(self):
+        return {
+            'followerId': self.followerId,
+            'followedId': self.followedId,
+            #'follower': self.follower.serialize(),
+            #'followed': self.followed.serialize(),
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt 
+        }        
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getAllFollower():
+        followers = list(map(lambda follower: follower.serialize(), Follow.query.all() ))
+        print('****models.Follower.followers=',followers)
+        return followers
+
 
 class User(db.Model):
     __tablename__ = 'User'
@@ -32,6 +88,27 @@ class User(db.Model):
     loginId = Column(Integer, ForeignKey('Login.id'))    
     login = relationship(Login)
 
+    #followedList = db.relationship("Follower", backref="User", lazy=True, uselist=False)
+    #followerList = db.relationship("Follower", backref="User", lazy=True, uselist=False)
+
+    #followedList = relationship("Follower", backref="User", lazy=True, uselist=False, secondary="Follower")
+    followeds = db.relationship(Follow, foreign_keys=[Follow.followerId], backref=db.backref('follower', lazy='joined'),lazy='dynamic', cascade='all, delete-orphan')
+    
+    followers = db.relationship(Follow, foreign_keys=[Follow.followedId], backref=db.backref('followed', lazy='joined'),lazy='dynamic', cascade='all, delete-orphan')
+
+    createdAt = Column(DateTime)
+    modifiedAt  = Column(DateTime)
+
+    # class constructor
+    def __init__(self, name, loginId):
+        """
+        Class constructor
+        """
+        self.name = name
+        self.loginId = loginId
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
     def __rep__(self):
         return "User %r>" % self.name
 
@@ -40,7 +117,51 @@ class User(db.Model):
             'id': self.id,
             'name': self.name,
             'login': self.login.serialize()  
-        }        
+        } 
+
+    def serialize_with_follow(self):
+        print('****User.serialize_with_follow.self.followeds:', self.followeds.all())
+        print('****User.serialize_with_follow.self.followers:', self.followers.all())
+        followeds = list(map(lambda followed: followed.serialize(), self.followeds.all()))
+        followers = list(map(lambda follower: follower.serialize(), self.followers.all()))
+        return {
+            'id': self.id,
+            'name': self.name,
+            'login': self.login.serialize(),
+            'followeds': followeds,
+            'followers': followers,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt
+        }    
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def follow(self, user):
+        if not self.is_following(user):
+            f = Follow(follower=self, followed=user)
+            f.save()
+
+    def unfollow(self, user):
+        f = self.followeds.filter_by(followedId=user.id).first()
+        if f:
+            f.delete()
+
+    def is_following(self, user):
+        return self.followeds.filter_by(followedId=user.id).first() is not None
+
+    def is_followed_by(self, user):
+        return self.followers.filter_by(followerId=user.id).first() is not None    
+
 
 class Region(db.Model):
     __tablename__ = 'Region'
@@ -70,22 +191,33 @@ class UserStore(db.Model):
     regionId = Column(Integer, ForeignKey('Region.id'))
     region = relationship(Region)
 
+    likes = Column(Integer, default=0)
+    title = Column(String(100), nullable = False)
+    bio = Column(String(200), nullable = False)
+    url = Column(String(100), nullable = False)
+    photoUrl = Column(String(100))
+    solds = Column(Integer, default=0)
+    sells = Column(Integer, default=0) 
+
     createdAt = db.Column(DateTime)
     modifiedAt  = db.Column(DateTime)
 
     products = relationship("Product", backref="UserStore", lazy=True, uselist=False)
 
     # class constructor
-    def __init__(self, name, userId, regionId):
+    def __init__(self, name, userId, regionId, title, bio, url, photoUrl):
         """
         Class constructor
         """
         self.name = name
         self.userId = userId
         self.regionId = regionId
+        self.title = title
+        self.bio = bio
+        self.url = url
+        self.photoUrl = photoUrl
         self.createdAt = datetime.datetime.utcnow()
         self.modifiedAt = datetime.datetime.utcnow()
-
 
     def __rep__(self):
         return "UserStore %r>" % self.name
