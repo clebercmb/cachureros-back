@@ -1,4 +1,4 @@
-import os
+import os,datetime 
 from flask import Flask, request, jsonify, url_for
 from flask_script import Manager 
 from flask_migrate import Migrate, MigrateCommand
@@ -7,6 +7,7 @@ from flask_cors import CORS
 from utils import APIException, generate_sitemap
 from sqlalchemy import event
 from sqlalchemy.event import listen
+from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity, jwt_required
 
 
 app = Flask(__name__)
@@ -17,10 +18,12 @@ app.config["DEBUG"] = True
 app.config["ENV"] = "development"
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(BASE_DIR, "database.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config['JWT_SECRET_KEY'] = 'secret-key'
 
 db.init_app(app)
 
 CORS(app)
+jwt = JWTManager(app)
 Migrate(app,db)
 
 manager = Manager(app)
@@ -31,32 +34,37 @@ products = [
 ]
 
 # Login
-@app.route('/login', methods=['GET'])
-def getLogin():
+@app.route('/login-all', methods=['GET'])
+def getLoginAll():
     print("** getLogin **")
     logins = Login.query.all()
     loginsList = list(map( lambda login: login.serialize(), logins ))
     return jsonify(loginsList), 200
 
-
-@app.route("/login", methods=['POST'])  
-def addLogin():
-    print('***addLogin***')
+@app.route('/login', methods=['POST'])
+def login():
+    print("** getLogin **")
     print(request.json)    
 
-    name = request.json.get('name',None)
-
-    print('name=', name)
-
-    if not name:
-        return jsonify({"msg":"login name is required"}), 422
-
-    login = Login()
-    login.name = name
+    email = request.json.get('email', None)
+    password = request.json.get('password', None)
     
-    db.session.add(login)
-    db.session.commit()
-    return jsonify(login.serialize()),201
+    print('email=', email, 'password=', password)
+
+    login = Login.get_login_by_email(email)
+    print('login=', login)
+
+    expires = datetime.timedelta(days=3)
+
+    data = {
+        "access_token": create_access_token(identity=login.email, expires_delta=expires),
+        "user": login.user.serialize_with_userStore()
+    }
+
+    print('login.data=', data)
+
+    return jsonify({"success": "Log In succesfully!", "data": data}), 200
+
 
 
 # User
@@ -665,7 +673,7 @@ def sitemap():
     db.session.add(Department(name='Etc y Tal'))
 
     #Login 1
-    login1 = Login(name='Login 1', email='juanita@gmail.com', password='1234')
+    login1 = Login(email='juanita@gmail.com', password='1234')
     user1 = User(name='User 1', loginId=1, photoUrl='/images/juanita.jpg', active=True)
     userStore1 = UserStore(name='UserStore 1', regionId=13, userId=1, title='Title', bio='Bio', url='juanita', photoUrl='/images/tendita.png')
 
@@ -674,7 +682,7 @@ def sitemap():
     userStore1.save()
 
     #Login 2
-    login2 = Login(name='Login 2', email='juan@gmail.com', password='1234')
+    login2 = Login(email='juan@gmail.com', password='1234')
     user2 = User(name='User 2', loginId=2, photoUrl='/images/juanita.jpg', active=True)
     userStore2 = UserStore(name='UserStore 2', regionId=13, userId=2, title='Title', bio='Bio', url='juan', photoUrl='/images/tendita.png')
 
@@ -683,7 +691,7 @@ def sitemap():
     userStore2.save()
 
     #Login 3
-    login3 = Login(name='Login 3', email='pablo@gmail.com', password='1234')
+    login3 = Login(email='pablo@gmail.com', password='1234')
     user3 = User(name='User 3', loginId=3, photoUrl='/images/juanita.jpg', active=True)
     userStore3 = UserStore(name='UserStore 3', regionId=13, userId=3, title='Title', bio='Bio', url='pablo', photoUrl='/images/tendita.png')  
 
@@ -691,6 +699,14 @@ def sitemap():
     user3.save()
     userStore3.save()
 
+    #Login 4
+    login4 = Login(email='camila@gmail.com', password='1234')
+    user4 = User(name='User 4', loginId=4, photoUrl='/images/juanita.jpg', active=True)
+    userStore4 = UserStore(name='UserStore 4', regionId=13, userId=4, title='Title', bio='Bio', url='camila', photoUrl='/images/tendita.png')  
+
+    login4.save()
+    user4.save()
+    userStore4.save()
 
     # Follows
     user1.follow(user2)
@@ -729,5 +745,4 @@ def sitemap():
 
 if __name__ == "__main__":
     manager.run()
-
 
