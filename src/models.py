@@ -10,23 +10,24 @@ db = SQLAlchemy()
 class Login(db.Model):
     __tablename__ = 'Login'
     id = Column(Integer, primary_key=True)
-    name = Column(String(50), unique=True)
     email = Column(String(50), unique=True)
+    password = Column(String(128), nullable = False)
 
-    password = Column(String(10), nullable = False)
+    user = db.relationship("User", backref="Login", lazy=True, uselist=False)
+
     createdAt = Column(DateTime)
     modifiedAt  = Column(DateTime)
 
     # class constructor
-    def __init__(self, name, email, password):
+    def __init__(self, email, password):
         """
         Class constructor
         """
-        self.name = name
         self.email = email
         self.password = password
         self.createdAt = datetime.datetime.utcnow()
         self.modifiedAt = datetime.datetime.utcnow()
+
 
     def __rep__(self):
         return "Login %r>" % self.name
@@ -34,12 +35,23 @@ class Login(db.Model):
     def serialize(self):
         return {
             'id': self.id,
-            'name': self.name,
             'email': self.email,
             'password': self.password,
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt 
+        } 
+    def serialize_with_user(self):
+        print('****Login.serialize_with_user:', self.user.query.first())
+        user = self.user.query.first()
+        return {
+            'id': self.id,
+            'email': self.email,
+            'password': self.password,
+            'user': user.serialize(),
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt 
         }  
+ 
 
     def save(self):
         db.session.add(self)
@@ -60,6 +72,12 @@ class Login(db.Model):
     @staticmethod
     def get_all_login():
         return Login.query.all()
+
+    @staticmethod
+    def get_login_by_email(email):
+        login = Login.query.filter_by(email=email).first()
+        return login 
+
 
 
 class Follow(db.Model):
@@ -134,6 +152,8 @@ class User(db.Model):
     
     followers = db.relationship(Follow, foreign_keys=[Follow.followedId], backref=db.backref('followed', lazy='joined'),lazy='dynamic', cascade='all, delete-orphan')
 
+    userStore = db.relationship("UserStore", backref="User", lazy=True, uselist=False)
+
     createdAt = db.Column(DateTime)
     modifiedAt  = db.Column(DateTime)
     active = db.Column(Boolean, default=True)
@@ -163,6 +183,20 @@ class User(db.Model):
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt
         } 
+
+    def serialize_with_userStore(self):
+        print('****Login.serialize_with_user:', self.userStore.query.first())
+        userstore = self.userStore.query.first()
+        return {
+            'id': self.id,
+            'name': self.name,
+            'login': self.login.serialize(),
+            'photoUrl': self.photoUrl,
+            'active': self.active,
+            'userStore': userstore.serialize(),
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt
+        }         
 
     def serialize_with_follow(self):
         print('****User.serialize_with_follow.self.followeds:', self.followeds.all())
