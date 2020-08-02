@@ -131,23 +131,24 @@ def getUserStore():
     userStoreList = UserStore.getAllUserStores()
     return jsonify(userStoreList), 200
 
-@app.route('/user-store-by-id/<int:id>', methods=['GET'])
-def getUserStoreById(id):
-    print("** getUserStore(id).request.method===>" ,  request.method)
-    userStore = UserStore.getOneUserStoreById(id)
 
-    print("** getUserStore(id).userStore=",userStore) 
+@app.route('/user-store/<string:url>', methods=['GET'])
+def getUserStoreByUrl(url):
+    print("** appy.getUserStoreByUrl(id).request.method===>" ,  request.method)
+    userStore = UserStore.getOneUserStoreByUrl(url)
+    print("** appy.getUserStoreByUrl.url=",url) 
+    print("** appy.getUserStoreByUrl.userStore=",userStore) 
 
     if userStore:
         return jsonify(userStore.serialize_with_product()), 200
     else:
         return jsonify({"msg":"UserStore not found"}), 404
 
-@app.route('/user-store/<string:url>', methods=['GET'])
-def getUserStoreByUrl(url):
+@app.route('/my-store/<int:id>', methods=['GET'])
+def getUserStoreById(id):
     print("** appy.getUserStoreByUrl(id).request.method===>" ,  request.method)
-    userStore = UserStore.getOneUserStoreByUrl(url)
-
+    print("** appy.getUserStoreByUrl.id=",id) 
+    userStore = UserStore.getOneUserStoreById(id)
     print("** appy.getUserStoreByUrl.userStore=",userStore) 
 
     if userStore:
