@@ -77,6 +77,22 @@ def getUserFollow():
     print('usersList=', usersList)
     return jsonify(usersList), 200
 
+@app.route('/user/<int:id>/followeds', methods=['GET'])
+def getFolloweds(id):
+    print("** getFolloweds **")
+    followeds = User.get_followeds_by_id(id)
+    usersList = list(map( lambda user: user.serialize(), followeds ))
+    print('usersList=', usersList)
+    return jsonify(usersList), 200
+
+@app.route('/user/<int:id>/followers', methods=['GET'])
+def getFollowers(id):
+    print("** getFollowers **")
+    followers = User.get_followers_by_id(id)
+    usersList = list(map( lambda user: user.serialize(), followers ))
+    print('usersList=', usersList)
+    return jsonify(usersList), 200
+
 
 @app.route("/user", methods=['POST'])  
 def addUser():
@@ -106,12 +122,24 @@ def getUserStore():
     userStoreList = UserStore.getAllUserStores()
     return jsonify(userStoreList), 200
 
-@app.route('/user-store/<int:id>', methods=['GET'])
+@app.route('/user-store-by-id/<int:id>', methods=['GET'])
 def getUserStoreById(id):
     print("** getUserStore(id).request.method===>" ,  request.method)
     userStore = UserStore.getOneUserStoreById(id)
 
-    print("** getUserStore(id).userStoreList=",userStore) 
+    print("** getUserStore(id).userStore=",userStore) 
+
+    if userStore:
+        return jsonify(userStore.serialize_with_product()), 200
+    else:
+        return jsonify({"msg":"UserStore not found"}), 404
+
+@app.route('/user-store/<string:url>', methods=['GET'])
+def getUserStoreByUrl(url):
+    print("** appy.getUserStoreByUrl(id).request.method===>" ,  request.method)
+    userStore = UserStore.getOneUserStoreByUrl(url)
+
+    print("** appy.getUserStoreByUrl.userStore=",userStore) 
 
     if userStore:
         return jsonify(userStore.serialize_with_product()), 200
@@ -636,21 +664,35 @@ def sitemap():
     db.session.add(Department(name='Electrodomésticos'))
     db.session.add(Department(name='Etc y Tal'))
 
-    db.session.add(Login(name='Login 1', email='juanita@gmail.com'))
-    user1 = User(name='User 1', loginId=1)
+    #Login 1
+    login1 = Login(name='Login 1', email='juanita@gmail.com', password='1234')
+    user1 = User(name='User 1', loginId=1, photoUrl='/images/juanita.jpg', active=True)
+    userStore1 = UserStore(name='UserStore 1', regionId=13, userId=1, title='Title', bio='Bio', url='juanita', photoUrl='/images/tendita.png')
+
+    login1.save()
     user1.save()
-    db.session.add(UserStore(name='UserStore 1', regionId=13, userId=1, title='Title', bio='Bio', url='juanita', photoUrl='/images/juanita.jpg'))  
+    userStore1.save()
 
-    db.session.add(Login(name='Login 2', email='juan@gmail.com'))
-    user2 = User(name='User 2', loginId=2)
+    #Login 2
+    login2 = Login(name='Login 2', email='juan@gmail.com', password='1234')
+    user2 = User(name='User 2', loginId=2, photoUrl='/images/juanita.jpg', active=True)
+    userStore2 = UserStore(name='UserStore 2', regionId=13, userId=2, title='Title', bio='Bio', url='juan', photoUrl='/images/tendita.png')
+
+    login2.save()
     user2.save() 
-    db.session.add(UserStore(name='UserStore 2', regionId=13, userId=2, title='Title', bio='Bio', url='juan', photoUrl='/images/juanita.jpg'))  
+    userStore2.save()
 
-    db.session.add(Login(name='Login 3', email='pablo@gmail.com'))
-    user3 = User(name='User 3', loginId=3)
-    user3.save() 
-    db.session.add(UserStore(name='UserStore 3', regionId=13, userId=3, title='Title', bio='Bio', url='pablo', photoUrl='/images/juanita.jpg'))  
+    #Login 3
+    login3 = Login(name='Login 3', email='pablo@gmail.com', password='1234')
+    user3 = User(name='User 3', loginId=3, photoUrl='/images/juanita.jpg', active=True)
+    userStore3 = UserStore(name='UserStore 3', regionId=13, userId=3, title='Title', bio='Bio', url='pablo', photoUrl='/images/tendita.png')  
 
+    login3.save()
+    user3.save()
+    userStore3.save()
+
+
+    # Follows
     user1.follow(user2)
     user1.follow(user3)
     user3.follow(user2)
