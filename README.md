@@ -7,7 +7,7 @@ $ Pip install pipenv<br />
 $ Python -m pip install --upgrade pip<br /><br />
 
 #Create file Pipfile<br />
-$ pipenv shell   (cria ambiente virtual)<br /><br />
+$ pipenv shell   (cria/inicia ambiente virtual)<br /><br />
 
 $ pipenv install flask flask-sqlalchemy flask-script flask-migrate flask-cors<br /><br />
 
