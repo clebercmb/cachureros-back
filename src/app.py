@@ -52,6 +52,10 @@ def login():
     print('email=', email, 'password=', password)
 
     login = Login.get_login_by_email(email)
+
+    if not login:
+        return jsonify({"msg":"Login not found"}), 404
+
     print('login=', login)
 
     expires = datetime.timedelta(days=3)
@@ -65,16 +69,29 @@ def login():
 
     return jsonify({"success": "Log In succesfully!", "data": data}), 200
 
-
-
 # User
 @app.route('/user', methods=['GET'])
-def getUser():
-    print("** getUser **")
+def getAllUsers():
+    print("** getAllUsers **")
     users = User.query.all()
     usersList = list(map( lambda user: user.serialize(), users ))
     print('usersList=', usersList)
     return jsonify(usersList), 200
+
+@app.route('/user/<int:id>', methods=['GET'])
+def getUser(id):
+    print("** getUser **")
+    user = User.getOneBy(id)
+    print('>>>user=', user)
+
+    print('>>>user.followeds=', user.getFolloweds())
+    print('>>>user.followers=', user.getFollowers())
+
+    if user:
+        return jsonify(user.serialize()), 200
+    else:
+        return jsonify({"msg":"User not found"}), 404
+
 
 
 @app.route('/user-follow', methods=['GET'])
@@ -435,24 +452,38 @@ def addWeightUnit():
 
 
 # Product
-@app.route('/product/<int:user_id>/<int:id>', methods=['GET'])
-def getProduct(user_id:None, id:None):
-    return  'Hello World:' + str(user_id) + ' ' + str(id)
-
-@app.route('/product/<int:user_id>', methods=['GET'])
-def getProductsFromUserStore(user_id=None):
+@app.route('/product/', methods=['GET'])
+def getAllProducts():
     print("** request.method===>" +  request.method)
-    products = Product.query.all()
+    products = Product.getAll()
+    print("***** getAllProducts.products===>",  products)
+
     productsList = list(map( lambda product: product.serialize(), products ))
     return jsonify(productsList), 200
 
 
-@app.route("/product/<int:user_id>", methods=['POST'])  
+@app.route('/product/<int:user_id>/<int:id>', methods=['GET'])
+def getProduct(user_id:None, id:None):
+    return  'Hello World:' + str(user_id) + ' ' + str(id)
+
+@app.route('/product/<int:id>', methods=['GET'])
+def getProductsFromUserStore(id=None):
+    print("** request.method===>" +  request.method)
+    product = Product.getOneById(id)
+    #productsList = list(map( lambda product: product.serialize(), products ))
+    if product:
+        return jsonify(product.serialize()), 200
+    else:
+        return jsonify({"msg":"Product not found"}), 404
+
+
+
+@app.route("/product", methods=['POST'])  
 def product_9post(user_id=None):
     print('***product_post***')
     print(request.json)    
 
-    userStoreId = user_id
+    userStoreId = request.json.get('userStoreId',None)
     name = request.json.get('name',None)
     brand = request.json.get('brand',None)
     model = request.json.get('model',None)
@@ -666,12 +697,20 @@ def sitemap():
     db.session.add(Region(code='15', name='Arica y Parinacota'))
     db.session.add(Region(code='16', name='\u00d1uble'))
 
-    db.session.add(Department(name='Hogar'))
-    db.session.add(Department(name='Ropa'))
-    db.session.add(Department(name='Calzado'))
-    db.session.add(Department(name='Informática'))
-    db.session.add(Department(name='Electrodomésticos'))
-    db.session.add(Department(name='Etc y Tal'))
+    #Department
+    department1 = Department(name='Hogar')
+    department2 = Department(name='Ropa')
+    department3 = Department(name='Calzado')
+    department4 = Department(name='Informática')
+    department5 = Department(name='Electrodomésticos')
+    department6 = Department(name='Etc y Tal')
+
+    department1.save()
+    department2.save()
+    department3.save()
+    department4.save()
+    department5.save()
+    department6.save()
 
     #Login 1
     login1 = Login(email='juanita@gmail.com', password='1234')
@@ -730,6 +769,21 @@ def sitemap():
     db.session.add(WeightUnit(name='gm'))
 
     db.session.commit()
+
+    #Products
+    product1 = Product(name="Product 1", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["/images/Imagen Muestra.png", "/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 6.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 7.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 8.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 9.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=1)
+    product1.save()
+
+    product2 = Product(name="Product 2", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["/images/Imagen Muestra.png", "/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 6.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 7.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 8.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 9.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=2)
+    product2.save()
+
+    product3 = Product(name="Product 3", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["/images/Imagen Muestra.png", "/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 6.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 7.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 8.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 9.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
+    product3.save()    
+
+    product4 = Product(name="Product 4", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["/images/Imagen Muestra.png", "/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 6.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 7.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 8.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 9.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
+    product4.save()    
+
+
 
     return 'Tables filled'
 
