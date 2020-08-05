@@ -606,8 +606,31 @@ class Product(db.Model):
             'userStore': self.userStore.serialize(),
             'department': self.department.serialize(),
             'size': self.size.serialize(),
-            'productState': self.productState.serialize()
-        }        
+            'productState': self.productState.serialize(),
+            'weightUnit': self.weightUnit.serialize()
+
+        }   
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getAll():
+        return Product.query.all()
+
+    @staticmethod
+    def getOneById(id):
+        return Product.query.get(id)
+
 
 class Cart(db.Model):
     __tablename__ = 'Cart'
