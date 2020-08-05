@@ -214,3 +214,9 @@ dmypy.json
 
 migrations
 database.db
+
+*.png 
+*.jpg
+*.jpeg
+*.gif
+*.pdf

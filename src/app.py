@@ -4,22 +4,32 @@ from flask_script import Manager
 from flask_migrate import Migrate, MigrateCommand
 from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, WeightUnit, Region, Follow
 from flask_cors import CORS
-from utils import APIException, generate_sitemap
+from utils import APIException, generate_sitemap, allowed_file
 from graphene import ObjectType, String, Schema
 from sqlalchemy import event
 from sqlalchemy.event import listen
 from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity, jwt_required
-
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+UPLOAD_FOLDER = "./static"
+ALLOWED_EXTENSIONS_IMGS = {'png', 'jpg', 'jpeg', 'gif'}
+ALLOWED_EXTENSIONS_FILES = {'pdf', 'png', 'jpg', 'jpeg'}
+THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
+IMAGES_FOLDER = THIS_FOLDER + "\\static\\images\\"
+
 app.config["DEBUG"] = True
 app.config["ENV"] = "development"
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(BASE_DIR, "database.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config['JWT_SECRET_KEY'] = 'secret-key'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+
+
 
 db.init_app(app)
 
@@ -464,11 +474,11 @@ def getAllProducts():
 
 
 @app.route('/product/<int:user_id>/<int:id>', methods=['GET'])
-def getProduct(user_id:None, id:None):
+def getProductsFromUserStore(user_id:None, id:None):
     return  'Hello World:' + str(user_id) + ' ' + str(id)
 
 @app.route('/product/<int:id>', methods=['GET'])
-def getProductsFromUserStore(id=None):
+def getProduct(id=None):
     print("** request.method===>" +  request.method)
     product = Product.getOneById(id)
     #productsList = list(map( lambda product: product.serialize(), products ))
@@ -480,123 +490,124 @@ def getProductsFromUserStore(id=None):
 
 
 @app.route("/product", methods=['POST'])  
-def product_9post(user_id=None):
-    print('***product_post***')
-    print(request.json)    
+def saveProduct():
+    print('***saveProductt***')
+    print('saveProduct.request.files=',request.files)
+    print('saveProduct.request.form=',request.form)
+    print('request.files.len=', len(request.files))
 
-    userStoreId = request.json.get('userStoreId',None)
-    name = request.json.get('name',None)
-    brand = request.json.get('brand',None)
-    model = request.json.get('model',None)
-    color = request.json.get('brand',None)
-    hasBrand = request.json.get('hasBrand',None)
-    price = request.json.get('price',None)
-    originalPrice = request.json.get('originalPrice',None)
-    qty = request.json.get('qty',None)
-    weight = request.json.get('weight',None)
-    photos = request.json.get('photos',None)
-    flete = request.json.get('flete',None)
-    urlPhoto1 = photos[0]
-    urlPhoto2 = photos[1]
-    urlPhoto3 = photos[2]
-    urlPhoto4 = photos[3]
-    urlPhoto5 = photos[4]
-
-    departmentId = request.json.get('departmentId')
-    categoryId = request.json.get('categoryId')
-    sizeId = request.json.get('sizeId')
-    productStateId = request.json.get('productStateId')
-    weightUnitId = request.json.get('weightUnitId')
-
-    print('userStoreId=', userStoreId, 'name=', name, 'brand=', brand, 'model=', model, 'color=', color, 'hasBrand=', hasBrand,'price=', price, 'originalPrice=', originalPrice, 'qty=', qty,  'weight=', weight, 'flete=', flete,'urlPhoto1=', urlPhoto1, 'urlPhoto2=', urlPhoto2, 'urlPhoto3=', urlPhoto3, 'urlPhoto4=', urlPhoto4, 'urlPhoto5=', urlPhoto5, 'userStoreId=', userStoreId, 'departmentId=', departmentId, 'categoryId=', categoryId, 'sizeId=',sizeId, 'productStateId=', productStateId, 'weightUnitId=', weightUnitId)
-
-    if not userStoreId:
+    if not request.form.get("userStoreId"):
         return jsonify({"msg":"userStoreId is required"}), 422
 
-    if not name:
+    if not request.form.get("name"):
         return jsonify({"msg":"name is required"}), 422
 
-    if not brand:
+    if not request.form.get("brand"):
         return jsonify({"msg":"brand is required"}), 422
 
-    if not model:
+    if not request.form.get("model"):
         return jsonify({"msg":"model is required"}), 422
 
-    if not color:
+    if not request.form.get("color"):
         return jsonify({"msg":"color is required"}), 422
 
-    if price is None:
+    if not request.form.get("hasBrand"):
+        return jsonify({"msg":"hasBrand is required"}), 422
+
+    if not request.form.get("price"):
         return jsonify({"msg":"price is required"}), 422
 
-    if originalPrice is None:
+    if not request.form.get("originalPrice"):
         return jsonify({"msg":"originalPrice is required"}), 422
 
-    if flete is None:
-        return jsonify({"msg":"flete is required"}), 422
-
-    if not qty:
+    if not request.form.get("qty"):
         return jsonify({"msg":"qty is required"}), 422
 
-    if weight is None:
+    if request.form.get("weight") is None:
         return jsonify({"msg":"weight is required"}), 422   
 
-    if not urlPhoto1:
-        return jsonify({"msg":"urlPhoto1 is required"}), 422   
-                    
-    if not urlPhoto2:
-        return jsonify({"msg":"urlPhoto2 is required"}), 422   
-
-    if not urlPhoto3:
-        return jsonify({"msg":"urlPhoto3 is required"}), 422   
-
-    if not urlPhoto4:
-        return jsonify({"msg":"urlPhoto4 is required"}), 422   
-
-    if not urlPhoto5:
-        return jsonify({"msg":"urlPhoto5 is required"}), 422   
-
-    if not departmentId:
+    if not request.form.get("departmentId"):
         return jsonify({"msg":"departmentId is required"}), 422   
 
-    if not categoryId:
+    if not request.form.get("categoryId"):
         return jsonify({"msg":"categoryId is required"}), 422
     
-    if not sizeId:
+    if not request.form.get("sizeId"):
         return jsonify({"msg":"sizeId is required"}), 422
 
-    if not productStateId:
+    if not request.form.get("productStateId"):
         return jsonify({"msg":"productStateId is required"}), 422
 
-    if not weightUnitId:
+    if not request.form.get("weightUnitId"):
         return jsonify({"msg":"weightUnitId is required"}), 422
 
-    product = Product()
-    product.userStoreId = userStoreId
-    product.name = name
-    product.brand = brand
-    product.model = model
-    product.color = color
-    product.hasBrand = hasBrand
-    product.price = price
-    product.originalPrice = originalPrice
-    product.qty = qty
-    product.weight = weight
-    product.flete = flete
-    product.photos = photos
-    product.urlPhoto1 = urlPhoto1
-    product.urlPhoto2 = urlPhoto2
-    product.urlPhoto3 = urlPhoto3
-    product.urlPhoto4 = urlPhoto4
-    product.urlPhoto5 = urlPhoto5
-    
-    product.departmentId = departmentId
-    product.categoryId = categoryId
-    product.sizeId = sizeId
-    product.productStateId = productStateId
-    product.weightUnitId = weightUnitId
+    if len(request.files) == 0:
+        return jsonify({"msg": "Not Selected File"}), 400  
 
-    db.session.add(product)
-    db.session.commit()
+    if not request.form.get("flete"):
+        return jsonify({"msg":"weightUnitId is required"}), 422
+
+    hasBrand = False
+    if hasBrand == 'true':
+        hasBrand = True
+
+    for i in range(len(request.files)):
+        photo = 'photo'+str(i)
+        if photo not in request.files:
+            msg = "{0} is required".format(photo)
+            return jsonify({"msg": msg}), 400 
+        file = request.files[photo]
+        if file.filename == '':
+            return jsonify({"msg": "Not Selected File"}), 400    
+        if not (file and allowed_file(file.filename, ALLOWED_EXTENSIONS_IMGS)):
+            msg = "Image {0} not allowed!".format(photo)
+            return jsonify({msg}), 400
+
+    photosUrl = []    
+    for i in range(len(request.files)):
+        photo = 'photo'+str(i)
+        print('*********photo=', photo)
+        file = request.files[photo]
+
+        login = Login.query.filter_by(email='camila@gmail.com').first()
+        filename = secure_filename(file.filename)
+        filename = "userStore_" + str(login.id) + "_" + filename
+        print('saveProduct.filename=',filename)
+        print('saveProduct.filename.os=',os.path.join(app.config['UPLOAD_FOLDER']+"/images"))
+        
+        #file.save(os.path.join(app.config['UPLOAD_FOLDER']+"\\images\\", filename))
+        file.save(os.path.join(IMAGES_FOLDER, filename))
+        print('>>>>i=', i)
+        photosUrl.append(filename)
+
+    print('saveProduct.photosUrl=', photosUrl)
+    print('saveProduct.request.form=', request.form)
+    print('saveProduct.flete=',request.form.get("flete"))
+
+    userStoreId = request.form.get("userStoreId")
+    name = request.form.get("name")
+    brand = request.form.get("brand")
+    model = request.form.get("model")
+    color = request.form.get("color")
+    hasBrand = bool(request.form.get("hasBrand"))
+    price = float(request.form.get("price"))
+    originalPrice = float(request.form.get("originalPrice"))
+    qty = int(request.form.get("qty"))
+    weight = int(request.form.get("weight"))
+    flete = float(request.form.get("flete"))
+
+    departmentId = int(request.form.get("departmentId"))
+    categoryId = int(request.form.get("categoryId"))
+    sizeId = int(request.form.get("sizeId"))
+    productStateId = int(request.form.get("productStateId"))
+    weightUnitId = int(request.form.get("weightUnitId"))
+
+    print('>>>>>>Product','userStoreId=', userStoreId, ', name=', name, ', brand=', brand, ', model=', model, ', color=', color, ', hasBrand=', hasBrand,', price=', price, ', originalPrice=', originalPrice, ', qty=', qty, ', weight=', weight, ', flete=', flete,', photosUrl=', photosUrl, ', userStoreId=', userStoreId, ', departmentId=', departmentId, ', categoryId=', categoryId, ', sizeId=',sizeId, ', productStateId=', productStateId, ', weightUnitId=', weightUnitId)
+
+    product = Product(name=name, price=price, originalPrice=originalPrice, hasBrand=hasBrand, brand=brand, color=color, model=model, weight=weight, flete=flete, qty=qty, photosUrl=photosUrl, departmentId=departmentId, categoryId=categoryId, sizeId=sizeId, productStateId=productStateId, weightUnitId=weightUnitId, userStoreId=userStoreId)
+
+    product.save()
+
     return jsonify(product.serialize()), 201
 
 
