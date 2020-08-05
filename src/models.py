@@ -559,6 +559,9 @@ class Product(db.Model):
         """
         Class constructor
         """
+        print('#####Product.__init__','userStoreId=', userStoreId, ', name=', name, ', brand=', brand, ', model=', model, ', color=', color, ', hasBrand=', hasBrand,', price=', price, ', originalPrice=', originalPrice, ', qty=', qty, ', weight=', weight, ', flete=', flete,', photosUrl=', photosUrl, ', userStoreId=', userStoreId, ', departmentId=', departmentId, ', categoryId=', categoryId, ', sizeId=',sizeId, ', productStateId=', productStateId, ', weightUnitId=', weightUnitId)
+
+
         self.name = name
         self.price = price
         self.originalPrice = originalPrice
@@ -574,7 +577,6 @@ class Product(db.Model):
         self.urlPhoto3 = photosUrl[2]
         self.urlPhoto4 = photosUrl[3]
         self.urlPhoto5 = photosUrl[4]
-
         self.userStoreId = userStoreId 
         self.departmentId = departmentId 
         self.categoryId = categoryId
