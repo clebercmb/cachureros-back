@@ -2,7 +2,7 @@ import os,datetime
 from flask import Flask, request, jsonify, url_for
 from flask_script import Manager 
 from flask_migrate import Migrate, MigrateCommand
-from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, WeightUnit, Region, Follow
+from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, Cart, CartProduct, WeightUnit, Region, Follow
 from flask_cors import CORS
 from utils import APIException, generate_sitemap, allowed_file
 from graphene import ObjectType, String, Schema
@@ -609,6 +609,84 @@ def saveProduct():
     product.save()
 
     return jsonify(product.serialize()), 201
+
+# Cart
+@app.route('/cart/<int:user_id>', methods=['GET'])
+def getCart(user_id):
+    print("** getCart **")
+    carts = Cart.query.all()
+    cartsList = list(map( lambda cart: cart.serialize(), carts ))
+    return jsonify(cartsList), 200
+
+
+@app.route("/cart/<int:user_id>", methods=['POST'])  
+def addCart(user_id):
+    print('***addCart***')
+    print(request.json)    
+
+    userId = user_id
+
+
+    print('userId=', userId)
+
+
+    if not userId:
+        return jsonify({"msg":"userId is required"}), 422
+
+
+
+    cart = Cart()
+    cart.userId = userId
+    
+    db.session.add(cart)
+    db.session.commit()
+    return jsonify(cart.serialize()),201
+
+# CartProduct
+@app.route('/cartproduct/<int:user_id>', methods=['GET'])
+def getCartProduct(user_id):
+    print("** getCartProduct **")
+    cartsproduct = CartProduct.query.all()
+    cartsList = list(map( lambda cartProduct: cartProduct.serialize(), cartsproduct ))
+    return jsonify(cartsList), 200
+
+
+@app.route("/cartproduct/<int:user_id>", methods=['POST'])  
+def addCartProduct(user_id):
+    print('***addCartProduct***')
+    print(request.json)    
+
+    price = request.json.get('price',None)
+    amount = request.json.get('amount',None)
+    productId = request.json.get('productId',None)
+    cartId = request.json.get('cartId',None)
+
+
+    print('price=', price, 'amount=', amount, 'productId=', productId, 'cartId=', cartId)
+
+    if not price:
+        return jsonify({"msg":"price is required"}), 422
+
+    if not amount:
+        return jsonify({"msg":"amount is required"}), 422
+
+    if not productId:
+        return jsonify({"msg":"productId is required"}), 422
+
+    if not cartId:
+        return jsonify({"msg":"cartId is required"}), 422
+
+
+
+    cartproduct = CartProduct()
+    cartproduct.price = price
+    cartproduct.amount = amount
+    cartproduct.productId = productId
+    cartproduct.cartId = cartId
+    
+    db.session.add(cartproduct)
+    db.session.commit()
+    return jsonify(cartproduct.serialize()),201
 
 
 # generate sitemap with all your endpoints
