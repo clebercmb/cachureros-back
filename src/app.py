@@ -1,5 +1,5 @@
 import os,datetime 
-from flask import Flask, request, jsonify, url_for
+from flask import Flask, request, jsonify, url_for, send_from_directory
 from flask_script import Manager 
 from flask_migrate import Migrate, MigrateCommand
 from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, Cart, CartProduct, WeightUnit, Region, Follow
@@ -610,6 +610,11 @@ def saveProduct():
 
     return jsonify(product.serialize()), 201
 
+@app.route('/images-products/<filename>')
+def image_profile(filename):
+    return send_from_directory(IMAGES_FOLDER,filename)
+
+
 # Cart
 @app.route('/cart/<int:user_id>', methods=['GET'])
 def getCart(user_id):
@@ -675,8 +680,6 @@ def addCartProduct(user_id):
 
     if not cartId:
         return jsonify({"msg":"cartId is required"}), 422
-
-
 
     cartproduct = CartProduct()
     cartproduct.price = price
