@@ -608,7 +608,6 @@ class Product(db.Model):
             'size': self.size.serialize(),
             'productState': self.productState.serialize(),
             'weightUnit': self.weightUnit.serialize()
-
         }   
 
     def save(self):

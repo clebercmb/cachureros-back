@@ -786,19 +786,17 @@ def sitemap():
     db.session.commit()
 
     #Products
-    product1 = Product(name="Product 1", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["/images/Imagen Muestra.png", "/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 6.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 7.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 8.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 9.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=1)
+    product1 = Product(name="Product 1", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_0.png", "image_1.png","image_2.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=1)
     product1.save()
 
-    product2 = Product(name="Product 2", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["/images/Imagen Muestra.png", "/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 6.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 7.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 8.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 9.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=2)
+    product2 = Product(name="Product 2", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_0.png", "image_1.png","image_2.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=2)
     product2.save()
 
-    product3 = Product(name="Product 3", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["/images/Imagen Muestra.png", "/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 6.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 7.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 8.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 9.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
+    product3 = Product(name="Product 3", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_0.png", "image_1.png","image_2.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
     product3.save()    
 
-    product4 = Product(name="Product 4", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["/images/Imagen Muestra.png", "/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 6.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 7.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 8.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 9.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
-    product4.save()    
-
-
+    product4 = Product(name="Product 4", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_0.png", "image_1.png","image_2.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
+    product4.save()
 
     return 'Tables filled'
 

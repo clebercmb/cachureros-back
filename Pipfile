@@ -19,7 +19,7 @@ flask-jwt-extended = "*"
 start = "python src/app.py runserver"
 init = "python src/app.py db init"
 migrate = "python src/app.py db migrate"
-upgrade = "src/app.py db upgrade"
+upgrade = "python src/app.py db upgrade"
 
 
 [requires]
