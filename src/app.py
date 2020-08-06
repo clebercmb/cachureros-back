@@ -1,26 +1,40 @@
-import os
-from flask import Flask, request, jsonify, url_for
+import os,datetime 
+from flask import Flask, request, jsonify, url_for, send_from_directory
 from flask_script import Manager 
 from flask_migrate import Migrate, MigrateCommand
 from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, Cart, CartProduct, WeightUnit, Region, Follow
 from flask_cors import CORS
-from utils import APIException, generate_sitemap
+from utils import APIException, generate_sitemap, allowed_file
+from graphene import ObjectType, String, Schema
 from sqlalchemy import event
 from sqlalchemy.event import listen
-
+from flask_jwt_extended import JWTManager, create_access_token, get_jwt_identity, jwt_required
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+UPLOAD_FOLDER = "./static"
+ALLOWED_EXTENSIONS_IMGS = {'png', 'jpg', 'jpeg', 'gif'}
+ALLOWED_EXTENSIONS_FILES = {'pdf', 'png', 'jpg', 'jpeg'}
+THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
+IMAGES_FOLDER = THIS_FOLDER + "\\static\\images\\"
+
 app.config["DEBUG"] = True
 app.config["ENV"] = "development"
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(BASE_DIR, "database.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config['JWT_SECRET_KEY'] = 'secret-key'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+
+
 
 db.init_app(app)
 
 CORS(app)
+jwt = JWTManager(app)
 Migrate(app,db)
 
 manager = Manager(app)
@@ -31,42 +45,64 @@ products = [
 ]
 
 # Login
-@app.route('/login', methods=['GET'])
-def getLogin():
+@app.route('/login-all', methods=['GET'])
+def getLoginAll():
     print("** getLogin **")
     logins = Login.query.all()
     loginsList = list(map( lambda login: login.serialize(), logins ))
     return jsonify(loginsList), 200
 
-
-@app.route("/login", methods=['POST'])  
-def addLogin():
-    print('***addLogin***')
+@app.route('/login', methods=['POST'])
+def login():
+    print("** getLogin **")
     print(request.json)    
 
-    name = request.json.get('name',None)
-
-    print('name=', name)
-
-    if not name:
-        return jsonify({"msg":"login name is required"}), 422
-
-    login = Login()
-    login.name = name
+    email = request.json.get('email', None)
+    password = request.json.get('password', None)
     
-    db.session.add(login)
-    db.session.commit()
-    return jsonify(login.serialize()),201
+    print('email=', email, 'password=', password)
 
+    login = Login.get_login_by_email(email)
+
+    if not login:
+        return jsonify({"msg":"Login not found"}), 404
+
+    print('login=', login)
+
+    expires = datetime.timedelta(days=3)
+
+    data = {
+        "access_token": create_access_token(identity=login.email, expires_delta=expires),
+        "user": login.user.serialize_with_userStore()
+    }
+
+    print('login.data=', data)
+
+    return jsonify({"success": "Log In succesfully!", "data": data}), 200
 
 # User
 @app.route('/user', methods=['GET'])
-def getUser():
-    print("** getUser **")
+def getAllUsers():
+    print("** getAllUsers **")
     users = User.query.all()
     usersList = list(map( lambda user: user.serialize(), users ))
     print('usersList=', usersList)
     return jsonify(usersList), 200
+
+@app.route('/user/<int:id>', methods=['GET'])
+def getUser(id):
+    print("** getUser **")
+    user = User.getOneBy(id)
+    print('>>>user=', user)
+
+    print('>>>user.followeds=', user.getFolloweds())
+    print('>>>user.followers=', user.getFollowers())
+
+    if user:
+        return jsonify(user.serialize()), 200
+    else:
+        return jsonify({"msg":"User not found"}), 404
+
 
 
 @app.route('/user-follow', methods=['GET'])
@@ -74,6 +110,22 @@ def getUserFollow():
     print("** getUser **")
     users = User.query.all()
     usersList = list(map( lambda user: user.serialize_with_follow(), users ))
+    print('usersList=', usersList)
+    return jsonify(usersList), 200
+
+@app.route('/user/<int:id>/followeds', methods=['GET'])
+def getFolloweds(id):
+    print("** getFolloweds **")
+    followeds = User.get_followeds_by_id(id)
+    usersList = list(map( lambda user: user.serialize(), followeds ))
+    print('usersList=', usersList)
+    return jsonify(usersList), 200
+
+@app.route('/user/<int:id>/followers', methods=['GET'])
+def getFollowers(id):
+    print("** getFollowers **")
+    followers = User.get_followers_by_id(id)
+    usersList = list(map( lambda user: user.serialize(), followers ))
     print('usersList=', usersList)
     return jsonify(usersList), 200
 
@@ -106,12 +158,25 @@ def getUserStore():
     userStoreList = UserStore.getAllUserStores()
     return jsonify(userStoreList), 200
 
-@app.route('/user-store/<int:id>', methods=['GET'])
-def getUserStoreById(id):
-    print("** getUserStore(id).request.method===>" ,  request.method)
-    userStore = UserStore.getOneUserStoreById(id)
 
-    print("** getUserStore(id).userStoreList=",userStore) 
+@app.route('/user-store/<string:url>', methods=['GET'])
+def getUserStoreByUrl(url):
+    print("** appy.getUserStoreByUrl(id).request.method===>" ,  request.method)
+    userStore = UserStore.getOneUserStoreByUrl(url)
+    print("** appy.getUserStoreByUrl.url=",url) 
+    print("** appy.getUserStoreByUrl.userStore=",userStore) 
+
+    if userStore:
+        return jsonify(userStore.serialize_with_product()), 200
+    else:
+        return jsonify({"msg":"UserStore not found"}), 404
+
+@app.route('/my-store/<int:id>', methods=['GET'])
+def getUserStoreById(id):
+    print("** appy.getUserStoreByUrl(id).request.method===>" ,  request.method)
+    print("** appy.getUserStoreByUrl.id=",id) 
+    userStore = UserStore.getOneUserStoreById(id)
+    print("** appy.getUserStoreByUrl.userStore=",userStore) 
 
     if userStore:
         return jsonify(userStore.serialize_with_product()), 200
@@ -398,137 +463,157 @@ def addWeightUnit():
 
 
 # Product
-@app.route('/product/<int:user_id>/<int:id>', methods=['GET'])
-def getProduct(user_id:None, id:None):
-    return  'Hello World:' + str(user_id) + ' ' + str(id)
-
-@app.route('/product/<int:user_id>', methods=['GET'])
-def getProductsFromUserStore(user_id=None):
+@app.route('/product/', methods=['GET'])
+def getAllProducts():
     print("** request.method===>" +  request.method)
-    products = Product.query.all()
+    products = Product.getAll()
+    print("***** getAllProducts.products===>",  products)
+
     productsList = list(map( lambda product: product.serialize(), products ))
     return jsonify(productsList), 200
 
 
-@app.route("/product/<int:user_id>", methods=['POST'])  
-def product_9post(user_id=None):
-    print('***product_post***')
-    print(request.json)    
+@app.route('/product/<int:user_id>/<int:id>', methods=['GET'])
+def getProductsFromUserStore(user_id:None, id:None):
+    return  'Hello World:' + str(user_id) + ' ' + str(id)
 
-    userStoreId = user_id
-    name = request.json.get('name',None)
-    brand = request.json.get('brand',None)
-    model = request.json.get('model',None)
-    color = request.json.get('brand',None)
-    hasBrand = request.json.get('hasBrand',None)
-    price = request.json.get('price',None)
-    originalPrice = request.json.get('originalPrice',None)
-    qty = request.json.get('qty',None)
-    weight = request.json.get('weight',None)
-    photos = request.json.get('photos',None)
-    flete = request.json.get('flete',None)
-    urlPhoto1 = photos[0]
-    urlPhoto2 = photos[1]
-    urlPhoto3 = photos[2]
-    urlPhoto4 = photos[3]
-    urlPhoto5 = photos[4]
+@app.route('/product/<int:id>', methods=['GET'])
+def getProduct(id=None):
+    print("** request.method===>" +  request.method)
+    product = Product.getOneById(id)
+    #productsList = list(map( lambda product: product.serialize(), products ))
+    if product:
+        return jsonify(product.serialize()), 200
+    else:
+        return jsonify({"msg":"Product not found"}), 404
 
-    departmentId = request.json.get('departmentId')
-    categoryId = request.json.get('categoryId')
-    sizeId = request.json.get('sizeId')
-    productStateId = request.json.get('productStateId')
-    weightUnitId = request.json.get('weightUnitId')
 
-    print('userStoreId=', userStoreId, 'name=', name, 'brand=', brand, 'model=', model, 'color=', color, 'hasBrand=', hasBrand,'price=', price, 'originalPrice=', originalPrice, 'qty=', qty,  'weight=', weight, 'flete=', flete,'urlPhoto1=', urlPhoto1, 'urlPhoto2=', urlPhoto2, 'urlPhoto3=', urlPhoto3, 'urlPhoto4=', urlPhoto4, 'urlPhoto5=', urlPhoto5, 'userStoreId=', userStoreId, 'departmentId=', departmentId, 'categoryId=', categoryId, 'sizeId=',sizeId, 'productStateId=', productStateId, 'weightUnitId=', weightUnitId)
 
-    if not userStoreId:
+@app.route("/product", methods=['POST'])  
+def saveProduct():
+    print('***saveProductt***')
+    print('saveProduct.request.files=',request.files)
+    print('saveProduct.request.form=',request.form)
+    print('request.files.len=', len(request.files))
+
+    if not request.form.get("userStoreId"):
         return jsonify({"msg":"userStoreId is required"}), 422
 
-    if not name:
+    if not request.form.get("name"):
         return jsonify({"msg":"name is required"}), 422
 
-    if not brand:
+    if not request.form.get("brand"):
         return jsonify({"msg":"brand is required"}), 422
 
-    if not model:
+    if not request.form.get("model"):
         return jsonify({"msg":"model is required"}), 422
 
-    if not color:
+    if not request.form.get("color"):
         return jsonify({"msg":"color is required"}), 422
 
-    if price is None:
+    if not request.form.get("hasBrand"):
+        return jsonify({"msg":"hasBrand is required"}), 422
+
+    if not request.form.get("price"):
         return jsonify({"msg":"price is required"}), 422
 
-    if originalPrice is None:
+    if not request.form.get("originalPrice"):
         return jsonify({"msg":"originalPrice is required"}), 422
 
-    if flete is None:
-        return jsonify({"msg":"flete is required"}), 422
-
-    if not qty:
+    if not request.form.get("qty"):
         return jsonify({"msg":"qty is required"}), 422
 
-    if weight is None:
+    if request.form.get("weight") is None:
         return jsonify({"msg":"weight is required"}), 422   
 
-    if not urlPhoto1:
-        return jsonify({"msg":"urlPhoto1 is required"}), 422   
-                    
-    if not urlPhoto2:
-        return jsonify({"msg":"urlPhoto2 is required"}), 422   
-
-    if not urlPhoto3:
-        return jsonify({"msg":"urlPhoto3 is required"}), 422   
-
-    if not urlPhoto4:
-        return jsonify({"msg":"urlPhoto4 is required"}), 422   
-
-    if not urlPhoto5:
-        return jsonify({"msg":"urlPhoto5 is required"}), 422   
-
-    if not departmentId:
+    if not request.form.get("departmentId"):
         return jsonify({"msg":"departmentId is required"}), 422   
 
-    if not categoryId:
+    if not request.form.get("categoryId"):
         return jsonify({"msg":"categoryId is required"}), 422
     
-    if not sizeId:
+    if not request.form.get("sizeId"):
         return jsonify({"msg":"sizeId is required"}), 422
 
-    if not productStateId:
+    if not request.form.get("productStateId"):
         return jsonify({"msg":"productStateId is required"}), 422
 
-    if not weightUnitId:
+    if not request.form.get("weightUnitId"):
         return jsonify({"msg":"weightUnitId is required"}), 422
 
-    product = Product()
-    product.userStoreId = userStoreId
-    product.name = name
-    product.brand = brand
-    product.model = model
-    product.color = color
-    product.hasBrand = hasBrand
-    product.price = price
-    product.originalPrice = originalPrice
-    product.qty = qty
-    product.weight = weight
-    product.flete = flete
-    product.photos = photos
-    product.urlPhoto1 = urlPhoto1
-    product.urlPhoto2 = urlPhoto2
-    product.urlPhoto3 = urlPhoto3
-    product.urlPhoto4 = urlPhoto4
-    product.urlPhoto5 = urlPhoto5
-    
-    product.departmentId = departmentId
-    product.categoryId = categoryId
-    product.sizeId = sizeId
-    product.productStateId = productStateId
-    product.weightUnitId = weightUnitId
+    if len(request.files) == 0:
+        return jsonify({"msg": "Not Selected File"}), 400  
 
-    db.session.add(product)
-    db.session.commit()
+    if not request.form.get("flete"):
+        return jsonify({"msg":"weightUnitId is required"}), 422
+
+    hasBrand = False
+    if hasBrand == 'true':
+        hasBrand = True
+
+    for i in range(len(request.files)):
+        photo = 'photo'+str(i)
+        if photo not in request.files:
+            msg = "{0} is required".format(photo)
+            return jsonify({"msg": msg}), 400 
+        file = request.files[photo]
+        if file.filename == '':
+            return jsonify({"msg": "Not Selected File"}), 400    
+        if not (file and allowed_file(file.filename, ALLOWED_EXTENSIONS_IMGS)):
+            msg = "Image {0} not allowed!".format(photo)
+            return jsonify({msg}), 400
+
+    photosUrl = []    
+    for i in range(len(request.files)):
+        photo = 'photo'+str(i)
+        print('*********photo=', photo)
+        file = request.files[photo]
+
+        login = Login.query.filter_by(email='camila@gmail.com').first()
+        filename = secure_filename(file.filename)
+        filename = "userStore_" + str(login.id) + "_" + filename
+        print('saveProduct.filename=',filename)
+        print('saveProduct.filename.os=',os.path.join(app.config['UPLOAD_FOLDER']+"/images"))
+        
+        #file.save(os.path.join(app.config['UPLOAD_FOLDER']+"\\images\\", filename))
+        file.save(os.path.join(IMAGES_FOLDER, filename))
+        print('>>>>i=', i)
+        photosUrl.append(filename)
+
+    print('saveProduct.photosUrl=', photosUrl)
+    print('saveProduct.request.form=', request.form)
+    print('saveProduct.flete=',request.form.get("flete"))
+
+    userStoreId = request.form.get("userStoreId")
+    name = request.form.get("name")
+    brand = request.form.get("brand")
+    model = request.form.get("model")
+    color = request.form.get("color")
+    hasBrand = bool(request.form.get("hasBrand"))
+    price = float(request.form.get("price"))
+    originalPrice = float(request.form.get("originalPrice"))
+    qty = int(request.form.get("qty"))
+    weight = int(request.form.get("weight"))
+    flete = float(request.form.get("flete"))
+
+    departmentId = int(request.form.get("departmentId"))
+    categoryId = int(request.form.get("categoryId"))
+    sizeId = int(request.form.get("sizeId"))
+    productStateId = int(request.form.get("productStateId"))
+    weightUnitId = int(request.form.get("weightUnitId"))
+
+    print('>>>>>>Product','userStoreId=', userStoreId, ', name=', name, ', brand=', brand, ', model=', model, ', color=', color, ', hasBrand=', hasBrand,', price=', price, ', originalPrice=', originalPrice, ', qty=', qty, ', weight=', weight, ', flete=', flete,', photosUrl=', photosUrl, ', userStoreId=', userStoreId, ', departmentId=', departmentId, ', categoryId=', categoryId, ', sizeId=',sizeId, ', productStateId=', productStateId, ', weightUnitId=', weightUnitId)
+
+    product = Product(name=name, price=price, originalPrice=originalPrice, hasBrand=hasBrand, brand=brand, color=color, model=model, weight=weight, flete=flete, qty=qty, photosUrl=photosUrl, departmentId=departmentId, categoryId=categoryId, sizeId=sizeId, productStateId=productStateId, weightUnitId=weightUnitId, userStoreId=userStoreId)
+
+    product.save()
+
     return jsonify(product.serialize()), 201
+
+@app.route('/images-products/<filename>')
+def image_profile(filename):
+    return send_from_directory(IMAGES_FOLDER,filename)
+
 
 # Cart
 @app.route('/cart/<int:user_id>', methods=['GET'])
@@ -596,8 +681,6 @@ def addCartProduct(user_id):
     if not cartId:
         return jsonify({"msg":"cartId is required"}), 422
 
-
-
     cartproduct = CartProduct()
     cartproduct.price = price
     cartproduct.amount = amount
@@ -629,28 +712,58 @@ def sitemap():
     db.session.add(Region(code='15', name='Arica y Parinacota'))
     db.session.add(Region(code='16', name='\u00d1uble'))
 
-    db.session.add(Department(name='Hogar'))
-    db.session.add(Department(name='Ropa'))
-    db.session.add(Department(name='Calzado'))
-    db.session.add(Department(name='Informática'))
-    db.session.add(Department(name='Electrodomésticos'))
-    db.session.add(Department(name='Etc y Tal'))
+    #Department
+    department1 = Department(name='Hogar')
+    department2 = Department(name='Ropa')
+    department3 = Department(name='Calzado')
+    department4 = Department(name='Informática')
+    department5 = Department(name='Electrodomésticos')
+    department6 = Department(name='Etc y Tal')
 
-    db.session.add(Login(name='Login 1', email='juanita@gmail.com'))
-    user1 = User(name='User 1', loginId=1)
+    department1.save()
+    department2.save()
+    department3.save()
+    department4.save()
+    department5.save()
+    department6.save()
+
+    #Login 1
+    login1 = Login(email='juanita@gmail.com', password='1234')
+    user1 = User(name='User 1', loginId=1, photoUrl='/images/juanita.jpg', active=True)
+    userStore1 = UserStore(name='UserStore 1', regionId=13, userId=1, title='Title', bio='Bio', url='juanita', photoUrl='/images/tendita.png')
+
+    login1.save()
     user1.save()
-    db.session.add(UserStore(name='UserStore 1', regionId=13, userId=1, title='Title', bio='Bio', url='juanita', photoUrl='/images/juanita.jpg'))  
+    userStore1.save()
 
-    db.session.add(Login(name='Login 2', email='juan@gmail.com'))
-    user2 = User(name='User 2', loginId=2)
+    #Login 2
+    login2 = Login(email='juan@gmail.com', password='1234')
+    user2 = User(name='User 2', loginId=2, photoUrl='/images/juanita.jpg', active=True)
+    userStore2 = UserStore(name='UserStore 2', regionId=13, userId=2, title='Title', bio='Bio', url='juan', photoUrl='/images/tendita.png')
+
+    login2.save()
     user2.save() 
-    db.session.add(UserStore(name='UserStore 2', regionId=13, userId=2, title='Title', bio='Bio', url='juan', photoUrl='/images/juanita.jpg'))  
+    userStore2.save()
 
-    db.session.add(Login(name='Login 3', email='pablo@gmail.com'))
-    user3 = User(name='User 3', loginId=3)
-    user3.save() 
-    db.session.add(UserStore(name='UserStore 3', regionId=13, userId=3, title='Title', bio='Bio', url='pablo', photoUrl='/images/juanita.jpg'))  
+    #Login 3
+    login3 = Login(email='pablo@gmail.com', password='1234')
+    user3 = User(name='User 3', loginId=3, photoUrl='/images/juanita.jpg', active=True)
+    userStore3 = UserStore(name='UserStore 3', regionId=13, userId=3, title='Title', bio='Bio', url='pablo', photoUrl='/images/tendita.png')  
 
+    login3.save()
+    user3.save()
+    userStore3.save()
+
+    #Login 4
+    login4 = Login(email='camila@gmail.com', password='1234')
+    user4 = User(name='User 4', loginId=4, photoUrl='/images/juanita.jpg', active=True)
+    userStore4 = UserStore(name='UserStore 4', regionId=13, userId=4, title='Title', bio='Bio', url='camila', photoUrl='/images/tendita.png')  
+
+    login4.save()
+    user4.save()
+    userStore4.save()
+
+    # Follows
     user1.follow(user2)
     user1.follow(user3)
     user3.follow(user2)
@@ -672,6 +785,21 @@ def sitemap():
 
     db.session.commit()
 
+    #Products
+    product1 = Product(name="Product 1", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["/images/Imagen Muestra.png", "/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 6.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 7.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 8.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 9.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=1)
+    product1.save()
+
+    product2 = Product(name="Product 2", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["/images/Imagen Muestra.png", "/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 6.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 7.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 8.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 9.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=2)
+    product2.save()
+
+    product3 = Product(name="Product 3", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["/images/Imagen Muestra.png", "/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 6.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 7.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 8.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 9.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
+    product3.save()    
+
+    product4 = Product(name="Product 4", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["/images/Imagen Muestra.png", "/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 6.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 7.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 8.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 9.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
+    product4.save()    
+
+
+
     return 'Tables filled'
 
 #if __name__ == '__main__':
@@ -687,5 +815,4 @@ def sitemap():
 
 if __name__ == "__main__":
     manager.run()
-
 

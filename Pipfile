@@ -13,6 +13,14 @@ flask-script = "*"
 flask-migrate = "*"
 flask-cors = "*"
 marshmallow-sqlalchemy = "*"
+flask-jwt-extended = "*"
+
+[scripts]
+start = "python src/app.py runserver"
+init = "python src/app.py db init"
+migrate = "python src/app.py db migrate"
+upgrade = "src/app.py db upgrade"
+
 
 [requires]
 python_version = "3.8"

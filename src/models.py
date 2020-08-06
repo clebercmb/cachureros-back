@@ -10,8 +10,24 @@ db = SQLAlchemy()
 class Login(db.Model):
     __tablename__ = 'Login'
     id = Column(Integer, primary_key=True)
-    name = Column(String(50), unique=True)
     email = Column(String(50), unique=True)
+    password = Column(String(128), nullable = False)
+
+    user = db.relationship("User", backref="Login", lazy=True, uselist=False)
+
+    createdAt = Column(DateTime)
+    modifiedAt  = Column(DateTime)
+
+    # class constructor
+    def __init__(self, email, password):
+        """
+        Class constructor
+        """
+        self.email = email
+        self.password = password
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
 
     def __rep__(self):
         return "Login %r>" % self.name
@@ -19,21 +35,55 @@ class Login(db.Model):
     def serialize(self):
         return {
             'id': self.id,
-            'name': self.name,
-            'email': self.email    
-        }        
+            'email': self.email,
+            'password': self.password,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt 
+        } 
+    def serialize_with_user(self):
+        print('****Login.serialize_with_user:', self.user)
+        return {
+            'id': self.id,
+            'email': self.email,
+            'password': self.password,
+            'user': self.user.serialize(),
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt 
+        }  
+ 
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def get_one_login(id):
+        return Login.query.get(id)
+
+    @staticmethod
+    def get_all_login():
+        return Login.query.all()
+
+    @staticmethod
+    def get_login_by_email(email):
+        login = Login.query.filter_by(email=email).first()
+        return login 
+
+
 
 class Follow(db.Model):
     __tablename__ = 'Follow'
 
     followerId = Column(Integer, ForeignKey('User.id'), primary_key = True )   
     followedId = Column(Integer, ForeignKey('User.id'), primary_key = True)    
-
-    #follower = db.relationship(User, foreign_keys=[Follow.followerId])
-    #followed = db.relationship(User, foreign_keys=[Follow.followedId])
-
-    #followers = db.relationship(Follow, foreign_keys=[Follow.followedId], backref=db.backref('followed', lazy='joined'),lazy='dynamic', cascade='all, delete-orphan')
-
 
     createdAt = Column(DateTime)
     modifiedAt  = Column(DateTime)
@@ -45,6 +95,10 @@ class Follow(db.Model):
         """
         self.followerId = follower.id
         self.followedId = followed.id
+
+        follower = db.relationship("User", foreign_keys=[Follow.followerId])
+        followed = db.relationship("User", foreign_keys=[Follow.followedId])
+
         self.createdAt = datetime.datetime.utcnow()
         self.modifiedAt = datetime.datetime.utcnow()
 
@@ -55,8 +109,8 @@ class Follow(db.Model):
         return {
             'followerId': self.followerId,
             'followedId': self.followedId,
-            #'follower': self.follower.serialize(),
-            #'followed': self.followed.serialize(),
+            'follower': self.follower.serialize(),
+            'followed': self.followed.serialize(),
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt 
         }        
@@ -87,6 +141,7 @@ class User(db.Model):
 
     loginId = Column(Integer, ForeignKey('Login.id'))    
     login = relationship(Login)
+    photoUrl=Column(String(100), default = '/images/tendita.png')
 
     #followedList = db.relationship("Follower", backref="User", lazy=True, uselist=False)
     #followerList = db.relationship("Follower", backref="User", lazy=True, uselist=False)
@@ -96,16 +151,21 @@ class User(db.Model):
     
     followers = db.relationship(Follow, foreign_keys=[Follow.followedId], backref=db.backref('followed', lazy='joined'),lazy='dynamic', cascade='all, delete-orphan')
 
-    createdAt = Column(DateTime)
-    modifiedAt  = Column(DateTime)
+    userStore = db.relationship("UserStore", backref="User", lazy=True, uselist=False)
+
+    createdAt = db.Column(DateTime)
+    modifiedAt  = db.Column(DateTime)
+    active = db.Column(Boolean, default=True)
 
     # class constructor
-    def __init__(self, name, loginId):
+    def __init__(self, name, loginId, photoUrl, active):
         """
         Class constructor
         """
         self.name = name
         self.loginId = loginId
+        self.photoUrl = photoUrl
+        self.active = active
         self.createdAt = datetime.datetime.utcnow()
         self.modifiedAt = datetime.datetime.utcnow()
 
@@ -116,8 +176,25 @@ class User(db.Model):
         return {
             'id': self.id,
             'name': self.name,
-            'login': self.login.serialize()  
+            'login': self.login.serialize(),
+            'photoUrl': self.photoUrl,
+            'active': self.active,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt
         } 
+
+    def serialize_with_userStore(self):
+        print('****Login.serialize_with_user:', self.userStore)
+        return {
+            'id': self.id,
+            'name': self.name,
+            'login': self.login.serialize(),
+            'photoUrl': self.photoUrl,
+            'active': self.active,
+            'userStore': self.userStore.serialize(),
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt
+        }         
 
     def serialize_with_follow(self):
         print('****User.serialize_with_follow.self.followeds:', self.followeds.all())
@@ -128,8 +205,10 @@ class User(db.Model):
             'id': self.id,
             'name': self.name,
             'login': self.login.serialize(),
+            'photoUrl': self.photoUrl,
             'followeds': followeds,
             'followers': followers,
+            'active': self.active,
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt
         }    
@@ -162,6 +241,40 @@ class User(db.Model):
     def is_followed_by(self, user):
         return self.followers.filter_by(followerId=user.id).first() is not None    
 
+    def get_followers_by_user(self, user):
+        return self.followers.filter_by(followerId=user.id).first() is not None
+
+    def getFolloweds(self):
+        followeds = list(map(lambda followed: followed.followed, self.followeds.all()))
+        return  followeds
+
+    def getFollowers(self):
+        followers = list(map(lambda follower: follower.follower, self.followers.all()))
+        return  followers
+
+    @staticmethod
+    def getOneBy(id):
+        return User.query.get(id)
+
+    @staticmethod
+    def get_followeds_by_id(id):
+        print('****User.get_followeds_by_user.id:', id)
+        user = User.get_one_user(id)
+        followeds = list(map(lambda followed: followed.followed, user.followeds.all()))
+
+        print('****User.get_followeds_by_id.followeds:', followeds)
+
+        return followeds  
+
+    @staticmethod
+    def get_followers_by_id(id):
+        print('****User.get_followers_by_id.id:', id)
+        user = User.get_one_user(id)
+        followers = list(map(lambda follower: follower.follower, user.followers.all()))
+
+        print('****User.get_followers_by_id.followers:', followers)
+
+        return followers  
 
 class Region(db.Model):
     __tablename__ = 'Region'
@@ -194,15 +307,16 @@ class UserStore(db.Model):
     likes = Column(Integer, default=0)
     title = Column(String(100), nullable = False)
     bio = Column(String(200), nullable = False)
-    url = Column(String(100), nullable = False)
-    photoUrl = Column(String(100))
+    url = Column(String(100), nullable = False, unique=True)
+    photoUrl = Column(String(100)) 
     solds = Column(Integer, default=0)
     sells = Column(Integer, default=0) 
 
     createdAt = db.Column(DateTime)
     modifiedAt  = db.Column(DateTime)
 
-    products = relationship("Product", backref="UserStore", lazy=True, uselist=False)
+    #products = relationship("Product", backref="UserStore", lazy=True, uselist=False)
+    products = relationship("Product", backref="UserStore", lazy=True)
 
     # class constructor
     def __init__(self, name, userId, regionId, title, bio, url, photoUrl):
@@ -228,21 +342,39 @@ class UserStore(db.Model):
             'name': self.name ,
             'user': self.user.serialize(),
             'region': self.region.serialize(),
+            'likes': self.likes,
+            'title': self.title,
+            'bio': self.bio,
+            'url': self.url,
+            'photoUrl': self.photoUrl,
+            'solds': self.solds,
+            'sells': self.sells,
+            'followers': self.user.followers.count(),
+            'followeds': self.user.followeds.count(),
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt
         }  
 
     def serialize_with_product(self):
-        print('****UserStore.serialize_with_product.products:', self.products.query.all())
-        products = list(map(lambda product: product.serialize(), self.products.query.all()))
+        print('****UserStore.serialize_with_product.products:', self.products)
+        products = list(map(lambda product: product.serialize(), self.products))
         return {
             'id': self.id,
             'name': self.name ,
             'user': self.user.serialize(),
             'region': self.region.serialize(),
+            'likes': self.likes,
+            'title': self.title,
+            'bio': self.bio,
+            'url': self.url,
+            'photoUrl': self.photoUrl,
+            'solds': self.solds,
+            'sells': self.sells,
+            'followers': self.user.followers.count(),
+            'followeds': self.user.followeds.count(),
+            'products':products,
             'createdAt': self.createdAt,
-            'modifiedAt': self.modifiedAt,
-            'products':products
+            'modifiedAt': self.modifiedAt
         }  
 
     def save(self):
@@ -266,14 +398,32 @@ class UserStore(db.Model):
     @staticmethod
     def getOneUserStoreById(id):
         return UserStore.query.get(id)
+
+    @staticmethod
+    def getOneUserStoreByUrl(url):
+        userStore = UserStore.query.filter_by(url=url).first()
+        return userStore    
     
 
 
 
 class Department(db.Model):
     __tablename__ = 'Department'
-    id = Column(Integer, primary_key=True)
-    name = Column(String(50), unique=True)
+    id = db.Column(Integer, primary_key=True)
+    name = db.Column(String(50), unique=True)
+
+    createdAt = db.Column(DateTime)
+    modifiedAt  = db.Column(DateTime)
+
+    # class constructor
+    def __init__(self, name):
+        """
+        Class constructor
+        """
+        self.name = name
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
 
     def __rep__(self):
         return "Department %r>" % self.name
@@ -281,8 +431,33 @@ class Department(db.Model):
     def serialize(self):
         return {
             "id": self.id,
-            "name": self.name    
-        }   
+            "name": self.name,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt  
+        }
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getAll():
+        departments = list(map(lambda department: department.serialize(), Department.query.all() ))
+        print('****models.Department.getAll=',departments)
+        return departments
+
+    @staticmethod
+    def getOneById(id):
+        return Department.query.get(id)
+
 
 class Category(db.Model):
     __tablename__ = 'Category'
@@ -342,42 +517,73 @@ class WeightUnit(db.Model):
 
 class Product(db.Model):
     __tablename__= 'Product'
-    id = Column(Integer, primary_key=True)
+    id = db.Column(Integer, primary_key=True)
 
-    name = Column(String(50), nullable = False)
-    price = Column(Float,nullable = False)
-    originalPrice = Column(Float, nullable = False)
-    flete = Column(Float, nullable = False)
-    hasBrand = Column(Boolean, nullable = False)
-    brand = Column(String(50))
-    color = Column(String(50))
-    model = Column(String(50))
-    weight = Column(Float, nullable = False)
+    name = db.Column(String(50), nullable = False)
+    price = db.Column(Float,nullable = False)
+    originalPrice = db.Column(Float, nullable = False)
+    flete = db.Column(Float, nullable = False)
+    hasBrand = db.Column(Boolean, nullable = False)
+    brand = db.Column(String(50))
+    color = db.Column(String(50))
+    model = db.Column(String(50))
+    weight = db.Column(Float, nullable = False)
 
-    qty = Column(Integer, nullable=False)
-    urlPhoto1 = Column(String(150))
-    urlPhoto2 = Column(String(150))
-    urlPhoto3 = Column(String(150))
-    urlPhoto4 = Column(String(150))
-    urlPhoto5 = Column(String(150))
+    qty = db.Column(Integer, nullable=False)
+    urlPhoto1 = db.Column(String(150))
+    urlPhoto2 = db.Column(String(150))
+    urlPhoto3 = db.Column(String(150))
+    urlPhoto4 = db.Column(String(150))
+    urlPhoto5 = db.Column(String(150))
 
-    userStoreId = Column(Integer, ForeignKey('UserStore.id'))
-    userStore = relationship(UserStore) 
+    userStoreId = db.Column(Integer, ForeignKey('UserStore.id'))
+    userStore = db.relationship(UserStore) 
 
-    departmentId = Column(Integer, ForeignKey('Department.id'))
-    department = relationship(Department) 
+    departmentId = db.Column(Integer, ForeignKey('Department.id'))
+    department = db.relationship(Department) 
 
-    categoryId = Column(Integer, ForeignKey('Category.id'))
-    category = relationship(Category) 
+    categoryId = db.Column(Integer, ForeignKey('Category.id'))
+    category = db.relationship(Category) 
 
-    sizeId = Column(Integer, ForeignKey('Size.id'))
-    size = relationship(Size) 
+    sizeId = db.Column(Integer, ForeignKey('Size.id'))
+    size = db.relationship(Size) 
 
-    productStateId = Column(Integer, ForeignKey('ProductState.id'))
-    productState = relationship(ProductState) 
+    productStateId = db.Column(Integer, ForeignKey('ProductState.id'))
+    productState = db.relationship(ProductState) 
 
-    weightUnitId = Column(Integer, ForeignKey('WeightUnit.id'))
-    weightUnit = relationship(WeightUnit) 
+    weightUnitId = db.Column(Integer, ForeignKey('WeightUnit.id'))
+    weightUnit = db.relationship(WeightUnit) 
+
+    # class constructor
+    def __init__(self, name, price, originalPrice, flete, hasBrand, brand, color, model, weight, qty, photosUrl, userStoreId, departmentId, categoryId, sizeId, productStateId, weightUnitId):
+        """
+        Class constructor
+        """
+        print('#####Product.__init__','userStoreId=', userStoreId, ', name=', name, ', brand=', brand, ', model=', model, ', color=', color, ', hasBrand=', hasBrand,', price=', price, ', originalPrice=', originalPrice, ', qty=', qty, ', weight=', weight, ', flete=', flete,', photosUrl=', photosUrl, ', userStoreId=', userStoreId, ', departmentId=', departmentId, ', categoryId=', categoryId, ', sizeId=',sizeId, ', productStateId=', productStateId, ', weightUnitId=', weightUnitId)
+
+
+        self.name = name
+        self.price = price
+        self.originalPrice = originalPrice
+        self.flete = flete
+        self.hasBrand = hasBrand
+        self.brand = brand
+        self.color = color
+        self.model = model
+        self.weight = weight
+        self.qty = qty
+        self.urlPhoto1 = photosUrl[0]
+        self.urlPhoto2 = photosUrl[1]
+        self.urlPhoto3 = photosUrl[2]
+        self.urlPhoto4 = photosUrl[3]
+        self.urlPhoto5 = photosUrl[4]
+        self.userStoreId = userStoreId 
+        self.departmentId = departmentId 
+        self.categoryId = categoryId
+        self.sizeId = sizeId 
+        self.productStateId = productStateId
+        self.weightUnitId = weightUnitId 
+
 
     def __rep__(self):
         return "Product %r>" % self.name
@@ -400,8 +606,31 @@ class Product(db.Model):
             'userStore': self.userStore.serialize(),
             'department': self.department.serialize(),
             'size': self.size.serialize(),
-            'productState': self.productState.serialize()
-        }        
+            'productState': self.productState.serialize(),
+            'weightUnit': self.weightUnit.serialize()
+
+        }   
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getAll():
+        return Product.query.all()
+
+    @staticmethod
+    def getOneById(id):
+        return Product.query.get(id)
+
 
 class Cart(db.Model):
     __tablename__ = 'Cart'
@@ -444,4 +673,24 @@ class CartProduct(db.Model):
             'productState': self.productState.serialize(),
             'weightUnit': self.weightUnit.serialize()
         }   
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getAll():
+        return Product.query.all()
+
+    @staticmethod
+    def getOneById(id):
+        return Product.query.get(id)
 
