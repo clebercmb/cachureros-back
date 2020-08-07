@@ -58,7 +58,7 @@ class Login(db.Model):
 
     def update(self):
         self.modifiedAt = datetime.datetime.utcnow()
-        db.commit()
+        db.session.committ()
 
     def delete(self):
         db.session.delete(self)
@@ -121,7 +121,7 @@ class Follow(db.Model):
 
     def update(self):
         self.modifiedAt = datetime.datetime.utcnow()
-        db.commit()
+        db.session.committ()
 
     def delete(self):
         db.session.delete(self)
@@ -219,7 +219,7 @@ class User(db.Model):
 
     def update(self):
         self.modifiedAt = datetime.datetime.utcnow()
-        db.commit()
+        db.session.committ()
 
     def delete(self):
         db.session.delete(self)
@@ -383,7 +383,7 @@ class UserStore(db.Model):
 
     def update(self):
         self.modifiedAt = datetime.datetime.utcnow()
-        db.commit()
+        db.session.committ()
 
     def delete(self):
         db.session.delete(self)
@@ -442,7 +442,7 @@ class Department(db.Model):
 
     def update(self):
         self.modifiedAt = datetime.datetime.utcnow()
-        db.commit()
+        db.session.committ()
 
     def delete(self):
         db.session.delete(self)
@@ -554,6 +554,9 @@ class Product(db.Model):
     weightUnitId = db.Column(Integer, ForeignKey('WeightUnit.id'))
     weightUnit = db.relationship(WeightUnit) 
 
+    createdAt = db.Column(DateTime)
+    modifiedAt  = db.Column(DateTime)
+
     # class constructor
     def __init__(self, name, price, originalPrice, flete, hasBrand, brand, color, model, weight, qty, photosUrl, userStoreId, departmentId, categoryId, sizeId, productStateId, weightUnitId):
         """
@@ -583,6 +586,8 @@ class Product(db.Model):
         self.sizeId = sizeId 
         self.productStateId = productStateId
         self.weightUnitId = weightUnitId 
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
 
 
     def __rep__(self):
@@ -602,6 +607,12 @@ class Product(db.Model):
             'qty': self.qty,
             'flete': self.flete,
             'photos': [self.urlPhoto1,self.urlPhoto2,self.urlPhoto3,self.urlPhoto4,self.urlPhoto5],
+            'categoryId': self.category.id,
+            'userStoreId': self.userStore.id,
+            'departmentId': self.department.id,
+            'sizeId': self.size.id,
+            'productStateId': self.productState.id,
+            'weightUnitId': self.weightUnit.id,            
             'category': self.category.serialize(),
             'userStore': self.userStore.serialize(),
             'department': self.department.serialize(),
@@ -614,9 +625,37 @@ class Product(db.Model):
         db.session.add(self)
         db.session.commit()
 
-    def update(self):
+    def update(self, name, price, originalPrice, flete, hasBrand, brand, color, model, weight, qty, photosUrl, userStoreId, departmentId, categoryId, sizeId, productStateId, weightUnitId):
+        self.name = name
+        self.price = price
+        self.originalPrice = originalPrice
+        self.flete = flete
+        self.hasBrand = hasBrand
+        self.brand = brand
+        self.color = color
+        self.model = model
+        self.weight = weight
+        self.qty = qty
+        self.userStoreId = userStoreId 
+        self.departmentId = departmentId 
+        self.categoryId = categoryId
+        self.sizeId = sizeId 
+        self.productStateId = productStateId
+        self.weightUnitId = weightUnitId 
         self.modifiedAt = datetime.datetime.utcnow()
-        db.commit()
+
+        if photosUrl[0]:
+            self.urlPhoto1 = photosUrl[0]
+        if photosUrl[1]:
+            self.urlPhoto2 = photosUrl[1]
+        if photosUrl[2]:    
+            self.urlPhoto3 = photosUrl[2]
+        if photosUrl[3]:
+            self.urlPhoto4 = photosUrl[3]
+        if photosUrl[4]:
+            self.urlPhoto5 = photosUrl[4]
+
+        db.session.commit()
 
     def delete(self):
         db.session.delete(self)
@@ -628,7 +667,10 @@ class Product(db.Model):
 
     @staticmethod
     def getOneById(id):
-        return Product.query.get(id)
+        print('models.Product.getOneById.id=', id)
+        product = Product.query.get(id)
+        print('models.Product.getOneById.product=', product)
+        return product
 
 
 class Cart(db.Model):
@@ -679,7 +721,7 @@ class CartProduct(db.Model):
 
     def update(self):
         self.modifiedAt = datetime.datetime.utcnow()
-        db.commit()
+        db.session.commit()
 
     def delete(self):
         db.session.delete(self)
