@@ -488,10 +488,10 @@ def getProduct(id=None):
         return jsonify({"msg":"Product not found"}), 404
 
 
-
-@app.route("/product", methods=['POST'])  
-def saveProduct():
-    print('***saveProductt***')
+@app.route("/product", methods=["GET", "POST"])
+@app.route("/product/<int:id>", methods=["PUT"])  
+def saveProduct(id=None):
+    print('***saveProductt *** => ', request.method)
     print('saveProduct.request.files=',request.files)
     print('saveProduct.request.form=',request.form)
     print('request.files.len=', len(request.files))
@@ -541,11 +541,23 @@ def saveProduct():
     if not request.form.get("weightUnitId"):
         return jsonify({"msg":"weightUnitId is required"}), 422
 
-    if len(request.files) == 0:
+    if len(request.files) == 0 and request.method == 'POST':
         return jsonify({"msg": "Not Selected File"}), 400  
 
     if not request.form.get("flete"):
-        return jsonify({"msg":"weightUnitId is required"}), 422
+        return jsonify({"msg":"flete is required"}), 422
+
+    if not request.form.get("hasUpLoadPhotos"):
+        return jsonify({"msg":"hasUpLoadPhotos is required"}), 422
+
+    hasUpLoadPhotos = request.form.get("hasUpLoadPhotos").split(',')
+    print('>>>saveProduct.hasUpLoadPhotos=',hasUpLoadPhotos)
+    print('>>>saveProduct.len(hasUpLoadPhotos)=',len(hasUpLoadPhotos))
+    for i in range(len(hasUpLoadPhotos)):
+        hasUpLoadPhotos[i] = bool(hasUpLoadPhotos[i] !='false' )    
+
+    print('>>>saveProduct.hasUpLoadPhotos (after)=', hasUpLoadPhotos)
+
 
     hasBrand = False
     if hasBrand == 'true':
@@ -557,14 +569,18 @@ def saveProduct():
             msg = "{0} is required".format(photo)
             return jsonify({"msg": msg}), 400 
         file = request.files[photo]
-        if file.filename == '':
-            return jsonify({"msg": "Not Selected File"}), 400    
+        if len(file.filename) == 0:
+            continue
+            #return jsonify({"msg": "Not Selected File"}), 400    
         if not (file and allowed_file(file.filename, ALLOWED_EXTENSIONS_IMGS)):
             msg = "Image {0} not allowed!".format(photo)
             return jsonify({msg}), 400
 
+
     photosUrl = []    
-    for i in range(len(request.files)):
+    for i in range(len(hasUpLoadPhotos)):
+        if not hasUpLoadPhotos[i]:
+            continue
         photo = 'photo'+str(i)
         print('*********photo=', photo)
         file = request.files[photo]
@@ -578,6 +594,7 @@ def saveProduct():
         #file.save(os.path.join(app.config['UPLOAD_FOLDER']+"\\images\\", filename))
         file.save(os.path.join(IMAGES_FOLDER, filename))
         print('>>>>i=', i)
+        hasUpLoadPhotos[i]=filename
         photosUrl.append(filename)
 
     print('saveProduct.photosUrl=', photosUrl)
@@ -604,11 +621,24 @@ def saveProduct():
 
     print('>>>>>>Product','userStoreId=', userStoreId, ', name=', name, ', brand=', brand, ', model=', model, ', color=', color, ', hasBrand=', hasBrand,', price=', price, ', originalPrice=', originalPrice, ', qty=', qty, ', weight=', weight, ', flete=', flete,', photosUrl=', photosUrl, ', userStoreId=', userStoreId, ', departmentId=', departmentId, ', categoryId=', categoryId, ', sizeId=',sizeId, ', productStateId=', productStateId, ', weightUnitId=', weightUnitId)
 
-    product = Product(name=name, price=price, originalPrice=originalPrice, hasBrand=hasBrand, brand=brand, color=color, model=model, weight=weight, flete=flete, qty=qty, photosUrl=photosUrl, departmentId=departmentId, categoryId=categoryId, sizeId=sizeId, productStateId=productStateId, weightUnitId=weightUnitId, userStoreId=userStoreId)
-
-    product.save()
+    product= None
+    if request.method == 'POST':
+        product = Product(name=name, price=price, originalPrice=originalPrice, hasBrand=hasBrand, brand=brand, color=color, model=model, weight=weight, flete=flete, qty=qty, photosUrl=photosUrl, departmentId=departmentId, categoryId=categoryId, sizeId=sizeId, productStateId=productStateId, weightUnitId=weightUnitId, userStoreId=userStoreId)
+        product.save()
+    else:
+        product = Product.getOneById(id)    
+        if not product:
+            return jsonify({"msg":"Product not found"}), 404
+        print('>>>saveProduct.photosUrl=>>>', photosUrl)
+        photosToBeSave = []
+        product.update(name=name, price=price, originalPrice=originalPrice, hasBrand=hasBrand, brand=brand, color=color, model=model, weight=weight, flete=flete, qty=qty, photosUrl=hasUpLoadPhotos, departmentId=departmentId, categoryId=categoryId, sizeId=sizeId, productStateId=productStateId, weightUnitId=weightUnitId, userStoreId=userStoreId)
+        print('>>>saveProduct.product (after save)=', product)
+        
 
     return jsonify(product.serialize()), 201
+
+
+
 
 @app.route('/images-products/<filename>')
 def image_profile(filename):
