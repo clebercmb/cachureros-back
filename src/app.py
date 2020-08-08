@@ -80,6 +80,41 @@ def login():
 
     return jsonify({"success": "Log In succesfully!", "data": data}), 200
 
+@app.route('/register', methods=['POST'])
+def register():
+    print("** register **")
+    print(request.json)    
+
+    name = request.json.get('name', None)
+    email = request.json.get('email', None)
+    password = request.json.get('password', None)
+    
+    print('>>>app.register>>', 'name=', name,'email=', email, 'password=', password)
+
+    login = Login(email=email, password=password)
+    login.save()
+
+    user = User(name=name, loginId=login.id, photoUrl=None, active=True)
+    user.save()
+
+    userStore = UserStore(name=name, userId=user.id, regionId=None, title='', bio='', url='', photoUrl=None)
+    userStore.save()
+    print('login=', login)
+
+    expires = datetime.timedelta(days=3)
+
+    data = {
+        "access_token": create_access_token(identity=login.email, expires_delta=expires),
+        "user": login.user.serialize_with_userStore()
+    }
+
+    print('login.data=', data)
+
+    return jsonify({"success": "Log In succesfully!", "data": data}), 200
+
+
+
+
 # User
 @app.route('/user', methods=['GET'])
 def getAllUsers():
@@ -488,10 +523,10 @@ def getProduct(id=None):
         return jsonify({"msg":"Product not found"}), 404
 
 
-
-@app.route("/product", methods=['POST'])  
-def saveProduct():
-    print('***saveProductt***')
+@app.route("/product", methods=["GET", "POST"])
+@app.route("/product/<int:id>", methods=["PUT"])  
+def saveProduct(id=None):
+    print('***saveProductt *** => ', request.method)
     print('saveProduct.request.files=',request.files)
     print('saveProduct.request.form=',request.form)
     print('request.files.len=', len(request.files))
@@ -541,11 +576,23 @@ def saveProduct():
     if not request.form.get("weightUnitId"):
         return jsonify({"msg":"weightUnitId is required"}), 422
 
-    if len(request.files) == 0:
+    if len(request.files) == 0 and request.method == 'POST':
         return jsonify({"msg": "Not Selected File"}), 400  
 
     if not request.form.get("flete"):
-        return jsonify({"msg":"weightUnitId is required"}), 422
+        return jsonify({"msg":"flete is required"}), 422
+
+    if not request.form.get("hasUpLoadPhotos"):
+        return jsonify({"msg":"hasUpLoadPhotos is required"}), 422
+
+    hasUpLoadPhotos = request.form.get("hasUpLoadPhotos").split(',')
+    print('>>>saveProduct.hasUpLoadPhotos=',hasUpLoadPhotos)
+    print('>>>saveProduct.len(hasUpLoadPhotos)=',len(hasUpLoadPhotos))
+    for i in range(len(hasUpLoadPhotos)):
+        hasUpLoadPhotos[i] = bool(hasUpLoadPhotos[i] !='false' )    
+
+    print('>>>saveProduct.hasUpLoadPhotos (after)=', hasUpLoadPhotos)
+
 
     hasBrand = False
     if hasBrand == 'true':
@@ -557,14 +604,18 @@ def saveProduct():
             msg = "{0} is required".format(photo)
             return jsonify({"msg": msg}), 400 
         file = request.files[photo]
-        if file.filename == '':
-            return jsonify({"msg": "Not Selected File"}), 400    
+        if len(file.filename) == 0:
+            continue
+            #return jsonify({"msg": "Not Selected File"}), 400    
         if not (file and allowed_file(file.filename, ALLOWED_EXTENSIONS_IMGS)):
             msg = "Image {0} not allowed!".format(photo)
             return jsonify({msg}), 400
 
+
     photosUrl = []    
-    for i in range(len(request.files)):
+    for i in range(len(hasUpLoadPhotos)):
+        if not hasUpLoadPhotos[i]:
+            continue
         photo = 'photo'+str(i)
         print('*********photo=', photo)
         file = request.files[photo]
@@ -578,6 +629,7 @@ def saveProduct():
         #file.save(os.path.join(app.config['UPLOAD_FOLDER']+"\\images\\", filename))
         file.save(os.path.join(IMAGES_FOLDER, filename))
         print('>>>>i=', i)
+        hasUpLoadPhotos[i]=filename
         photosUrl.append(filename)
 
     print('saveProduct.photosUrl=', photosUrl)
@@ -604,11 +656,24 @@ def saveProduct():
 
     print('>>>>>>Product','userStoreId=', userStoreId, ', name=', name, ', brand=', brand, ', model=', model, ', color=', color, ', hasBrand=', hasBrand,', price=', price, ', originalPrice=', originalPrice, ', qty=', qty, ', weight=', weight, ', flete=', flete,', photosUrl=', photosUrl, ', userStoreId=', userStoreId, ', departmentId=', departmentId, ', categoryId=', categoryId, ', sizeId=',sizeId, ', productStateId=', productStateId, ', weightUnitId=', weightUnitId)
 
-    product = Product(name=name, price=price, originalPrice=originalPrice, hasBrand=hasBrand, brand=brand, color=color, model=model, weight=weight, flete=flete, qty=qty, photosUrl=photosUrl, departmentId=departmentId, categoryId=categoryId, sizeId=sizeId, productStateId=productStateId, weightUnitId=weightUnitId, userStoreId=userStoreId)
-
-    product.save()
+    product= None
+    if request.method == 'POST':
+        product = Product(name=name, price=price, originalPrice=originalPrice, hasBrand=hasBrand, brand=brand, color=color, model=model, weight=weight, flete=flete, qty=qty, photosUrl=photosUrl, departmentId=departmentId, categoryId=categoryId, sizeId=sizeId, productStateId=productStateId, weightUnitId=weightUnitId, userStoreId=userStoreId)
+        product.save()
+    else:
+        product = Product.getOneById(id)    
+        if not product:
+            return jsonify({"msg":"Product not found"}), 404
+        print('>>>saveProduct.photosUrl=>>>', photosUrl)
+        photosToBeSave = []
+        product.update(name=name, price=price, originalPrice=originalPrice, hasBrand=hasBrand, brand=brand, color=color, model=model, weight=weight, flete=flete, qty=qty, photosUrl=hasUpLoadPhotos, departmentId=departmentId, categoryId=categoryId, sizeId=sizeId, productStateId=productStateId, weightUnitId=weightUnitId, userStoreId=userStoreId)
+        print('>>>saveProduct.product (after save)=', product)
+        
 
     return jsonify(product.serialize()), 201
+
+
+
 
 @app.route('/images-products/<filename>')
 def image_profile(filename):
@@ -786,19 +851,17 @@ def sitemap():
     db.session.commit()
 
     #Products
-    product1 = Product(name="Product 1", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["/images/Imagen Muestra.png", "/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 6.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 7.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 8.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 9.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=1)
+    product1 = Product(name="Product 1", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_0.png", "image_1.png","image_2.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=1)
     product1.save()
 
-    product2 = Product(name="Product 2", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["/images/Imagen Muestra.png", "/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 6.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 7.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 8.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 9.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=2)
+    product2 = Product(name="Product 2", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_0.png", "image_1.png","image_2.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=2)
     product2.save()
 
-    product3 = Product(name="Product 3", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["/images/Imagen Muestra.png", "/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 6.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 7.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 8.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 9.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
+    product3 = Product(name="Product 3", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_0.png", "image_1.png","image_2.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
     product3.save()    
 
-    product4 = Product(name="Product 4", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["/images/Imagen Muestra.png", "/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 6.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 7.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 8.png","/images/Zapatillas-deportivas-transpirables-a-la-moda-para-hombre-y-mujer 9.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
-    product4.save()    
-
-
+    product4 = Product(name="Product 4", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_0.png", "image_1.png","image_2.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
+    product4.save()
 
     return 'Tables filled'
 
