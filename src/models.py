@@ -301,14 +301,14 @@ class UserStore(db.Model):
     userId = Column(Integer, ForeignKey('User.id'))
     user = relationship(User)
 
-    regionId = Column(Integer, ForeignKey('Region.id'))
+    regionId = Column(Integer, ForeignKey('Region.id'), nullable = True)
     region = relationship(Region)
 
     likes = Column(Integer, default=0)
-    title = Column(String(100), nullable = False)
-    bio = Column(String(200), nullable = False)
-    url = Column(String(100), nullable = False, unique=True)
-    photoUrl = Column(String(100)) 
+    title = Column(String(100))
+    bio = Column(String(200))
+    url = Column(String(100))
+    photoUrl = Column(String(100), default = '/images/tendita.png') 
     solds = Column(Integer, default=0)
     sells = Column(Integer, default=0) 
 
@@ -337,11 +337,14 @@ class UserStore(db.Model):
         return "UserStore %r>" % self.name
 
     def serialize(self):
+        region = ''
+        if self.region != None:
+            region=self.region.serialize()
         return {
             'id': self.id,
             'name': self.name ,
             'user': self.user.serialize(),
-            'region': self.region.serialize(),
+            'region': region,
             'likes': self.likes,
             'title': self.title,
             'bio': self.bio,
@@ -358,11 +361,14 @@ class UserStore(db.Model):
     def serialize_with_product(self):
         print('****UserStore.serialize_with_product.products:', self.products)
         products = list(map(lambda product: product.serialize(), self.products))
+        region=''
+        if self.region != None:
+            region=self.region.serialize()
         return {
             'id': self.id,
             'name': self.name ,
             'user': self.user.serialize(),
-            'region': self.region.serialize(),
+            'region': region,
             'likes': self.likes,
             'title': self.title,
             'bio': self.bio,

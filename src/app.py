@@ -80,6 +80,41 @@ def login():
 
     return jsonify({"success": "Log In succesfully!", "data": data}), 200
 
+@app.route('/register', methods=['POST'])
+def register():
+    print("** register **")
+    print(request.json)    
+
+    name = request.json.get('name', None)
+    email = request.json.get('email', None)
+    password = request.json.get('password', None)
+    
+    print('>>>app.register>>', 'name=', name,'email=', email, 'password=', password)
+
+    login = Login(email=email, password=password)
+    login.save()
+
+    user = User(name=name, loginId=login.id, photoUrl=None, active=True)
+    user.save()
+
+    userStore = UserStore(name=name, userId=user.id, regionId=None, title='', bio='', url='', photoUrl=None)
+    userStore.save()
+    print('login=', login)
+
+    expires = datetime.timedelta(days=3)
+
+    data = {
+        "access_token": create_access_token(identity=login.email, expires_delta=expires),
+        "user": login.user.serialize_with_userStore()
+    }
+
+    print('login.data=', data)
+
+    return jsonify({"success": "Log In succesfully!", "data": data}), 200
+
+
+
+
 # User
 @app.route('/user', methods=['GET'])
 def getAllUsers():
