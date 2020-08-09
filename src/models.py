@@ -141,7 +141,7 @@ class User(db.Model):
 
     loginId = Column(Integer, ForeignKey('Login.id'))    
     login = relationship(Login)
-    photoUrl=Column(String(100), default = '/images/tendita.png')
+    photoUrl=Column(String(100), default = 'tendita.png')
 
     #followedList = db.relationship("Follower", backref="User", lazy=True, uselist=False)
     #followerList = db.relationship("Follower", backref="User", lazy=True, uselist=False)
@@ -349,7 +349,7 @@ class UserStore(db.Model):
     title = Column(String(100))
     bio = Column(String(200))
     url = Column(String(100))
-    photoUrl = Column(String(100), default = '/images/tendita.png') 
+    photoUrl = Column(String(100), default = 'tendita.png') 
     solds = Column(Integer, default=0)
     sells = Column(Integer, default=0) 
 
