@@ -58,14 +58,14 @@ class Login(db.Model):
 
     def update(self):
         self.modifiedAt = datetime.datetime.utcnow()
-        db.session.committ()
+        db.session.commit()
 
     def delete(self):
         db.session.delete(self)
         db.session.commit()
 
     @staticmethod
-    def get_one_login(id):
+    def getOneById(id):
         return Login.query.get(id)
 
     @staticmethod
@@ -153,12 +153,15 @@ class User(db.Model):
 
     userStore = db.relationship("UserStore", backref="User", lazy=True, uselist=False)
 
+    birthDate = db.Column(DateTime)
+    nationalId = db.Column(String(9)) #, unique=True)
+    phone = db.Column(String(20))
     createdAt = db.Column(DateTime)
     modifiedAt  = db.Column(DateTime)
     active = db.Column(Boolean, default=True)
 
     # class constructor
-    def __init__(self, name, loginId, photoUrl, active):
+    def __init__(self, name, loginId, photoUrl, active, birthDate, phone, nationalId):
         """
         Class constructor
         """
@@ -166,6 +169,9 @@ class User(db.Model):
         self.loginId = loginId
         self.photoUrl = photoUrl
         self.active = active
+        self.birthDate = birthDate
+        self.nationalId = nationalId
+        self.phone = phone
         self.createdAt = datetime.datetime.utcnow()
         self.modifiedAt = datetime.datetime.utcnow()
 
@@ -173,24 +179,56 @@ class User(db.Model):
         return "User %r>" % self.name
 
     def serialize(self):
+        birthDate = self.birthDate
+        if birthDate == None:
+            birthDate=''
+        else:
+            birthDate = birthDate.strftime('%d/%m/%Y')
+
+        nationalId = self.nationalId
+        if nationalId == None:
+            nationalId=''
+
+        phone = self.phone
+        if phone == None:
+            phone = ''    
+
         return {
             'id': self.id,
             'name': self.name,
             'login': self.login.serialize(),
             'photoUrl': self.photoUrl,
             'active': self.active,
+            'birthDate': birthDate,
+            'nationalId': nationalId,
+            'phone': phone,
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt
         } 
 
     def serialize_with_userStore(self):
         print('****Login.serialize_with_user:', self.userStore)
+        birthDate = self.birthDate
+        if birthDate == None:
+            birthDate=''
+
+        nationalId = self.nationalId
+        if nationalId == None:
+            nationalId=''
+
+        phone = self.phone
+        if phone == None:
+            phone = '' 
+
         return {
             'id': self.id,
             'name': self.name,
             'login': self.login.serialize(),
             'photoUrl': self.photoUrl,
             'active': self.active,
+            'birthDate': birthDate,
+            'nationalId': nationalId,
+            'phone': phone,
             'userStore': self.userStore.serialize(),
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt
@@ -209,6 +247,9 @@ class User(db.Model):
             'followeds': followeds,
             'followers': followers,
             'active': self.active,
+            'birthDate': self.birthDate,
+            'nationalId': self.nationalId,
+            'phone': self.phone,
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt
         }    
@@ -319,14 +360,13 @@ class UserStore(db.Model):
     products = relationship("Product", backref="UserStore", lazy=True)
 
     # class constructor
-    def __init__(self, name, userId, regionId, title, bio, url, photoUrl):
+    def __init__(self, name, userId, regionId, bio, url, photoUrl):
         """
         Class constructor
         """
         self.name = name
         self.userId = userId
         self.regionId = regionId
-        self.title = title
         self.bio = bio
         self.url = url
         self.photoUrl = photoUrl
@@ -340,6 +380,7 @@ class UserStore(db.Model):
         region = ''
         if self.region != None:
             region=self.region.serialize()
+
         return {
             'id': self.id,
             'name': self.name ,

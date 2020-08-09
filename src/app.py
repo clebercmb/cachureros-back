@@ -1,4 +1,4 @@
-import os,datetime 
+import os, datetime 
 from flask import Flask, request, jsonify, url_for, send_from_directory
 from flask_script import Manager 
 from flask_migrate import Migrate, MigrateCommand
@@ -94,7 +94,7 @@ def register():
     login = Login(email=email, password=password)
     login.save()
 
-    user = User(name=name, loginId=login.id, photoUrl=None, active=True)
+    user = User(name=name, loginId=login.id, photoUrl=None, active=True, birthDate=None, nationalId=None, phone=None)
     user.save()
 
     userStore = UserStore(name=name, userId=user.id, regionId=None, title='', bio='', url='', photoUrl=None)
@@ -111,8 +111,6 @@ def register():
     print('login.data=', data)
 
     return jsonify({"success": "Log In succesfully!", "data": data}), 200
-
-
 
 
 # User
@@ -137,7 +135,6 @@ def getUser(id):
         return jsonify(user.serialize()), 200
     else:
         return jsonify({"msg":"User not found"}), 404
-
 
 
 @app.route('/user-follow', methods=['GET'])
@@ -206,19 +203,6 @@ def getUserStoreByUrl(url):
     else:
         return jsonify({"msg":"UserStore not found"}), 404
 
-@app.route('/my-store/<int:id>', methods=['GET'])
-def getUserStoreById(id):
-    print("** appy.getUserStoreByUrl(id).request.method===>" ,  request.method)
-    print("** appy.getUserStoreByUrl.id=",id) 
-    userStore = UserStore.getOneUserStoreById(id)
-    print("** appy.getUserStoreByUrl.userStore=",userStore) 
-
-    if userStore:
-        return jsonify(userStore.serialize_with_product()), 200
-    else:
-        return jsonify({"msg":"UserStore not found"}), 404
-
-
 @app.route("/user-store", methods=['POST'])  
 def addUserStoreId():
     print('***addUserStoreId***')
@@ -228,7 +212,6 @@ def addUserStoreId():
     name = request.json.get('name',None)
     userId = request.json.get('userId',None)
     regionId = request.json.get('regionId', None)
- 
 
     print('name=', name, 'userId=', userId)
 
@@ -249,6 +232,115 @@ def addUserStoreId():
     userStore.save()
 
     return jsonify(userStore.serialize()),201
+
+@app.route('/my-store/<int:id>', methods=['GET'])
+def getUserStoreById(id):
+    print("** appy.getUserStoreById(id).request.method===>" ,  request.method)
+    print("** appy.getUserStoreById.id=",id) 
+    userStore = UserStore.getOneUserStoreById(id)
+    print("** appy.getUserStoreById.userStore=",userStore) 
+
+    if userStore:
+        return jsonify(userStore.serialize_with_product()), 200
+    else:
+        return jsonify({"msg":"UserStore not found"}), 404
+
+
+@app.route('/my-store/<int:id>', methods=['PUT'])
+def saveUserStoreById(id):
+    print("** appy.saveUserStoreById(id).request.method===>" ,  request.method)
+    print("** appy.saveUserStoreById.id=",id) 
+    userStore = UserStore.getOneUserStoreById(id)
+    print("** appy.saveUserStoreById.userStore=",userStore) 
+
+    email = request.form.get("email", None)
+    password = request.form.get("password", None)
+    userName = request.form.get("userName", None)
+    birthDate = request.form.get("birthDate", None)
+    nationalId= request.form.get("nationalId", None)
+    phone = request.form.get("phone", None)
+    userStoreName = request.form.get("userStoreName", None)
+    regionId = request.form.get("regionId", None)
+    bio = request.form.get("bio", None)
+    url = request.form.get("url", None)
+    userStorePhotoUrl = request.form.get("userStorePhotoUrl", None)
+    hasUserStorePhotoUrl = request.form.get("hasUserStorePhotoUrl") != 'false'
+    userPhotoUrl = request.form.get("userPhotoUrl", None)
+    hasUserPhotoUrl = request.form.get("hasUserPhotoUrl") != 'false'
+
+    #birthDate = datetime.datetime.strptime(birthDate, '%d/%m/%y')
+    print('>>>birthDate=', birthDate, type(birthDate))
+    birthDateFormated= ''
+    try:
+        birthDateFormated = datetime.datetime.strptime(str(birthDate), '%d/%m/%Y').date()
+    except ValueError as ve:
+        print('########saveUserStoreById.invalid date:, ', ve)
+        return jsonify({"msg":"invalid birthdate"}), 422
+
+    birthDate = birthDateFormated
+
+    print('<<<saveUserStoreById>>> email=', email, ', password=', password, ', userName=', userName, ', birthDate=', birthDate, ', nationalId=', nationalId, ', phone=', phone, ', userStoreName=', userStoreName, ', regionId=', regionId, ', bio=', bio, ', url=', url,  ', userStorePhotoUrl=', userStorePhotoUrl, userStorePhotoUrl == None, ', hasUserStorePhotoUrl=', hasUserStorePhotoUrl, ', userPhotoUrl=', userPhotoUrl, ', hasUserPhotoUrl=', hasUserPhotoUrl)
+
+    if not userStore:
+        return jsonify({"msg":"UserStore not found"}), 404
+
+    if not request.form.get("email"):
+        return jsonify({"msg":"email is required"}), 422
+
+    if not request.form.get("password"):
+        return jsonify({"msg":"password is required"}), 422
+
+    if not request.form.get("userName"):
+        return jsonify({"msg":"userName is required"}), 422
+
+    if not request.form.get("birthDate"):
+        return jsonify({"msg":"birthDate is required"}), 422
+
+    if not request.form.get("nationalId"):
+        return jsonify({"msg":"nationalId is required"}), 422
+
+    if not request.form.get("phone"):
+        return jsonify({"msg":"phone is required"}), 422
+
+    if not request.form.get("userStoreName"):
+        return jsonify({"msg":"userStoreName is required"}), 422
+
+    if not request.form.get("regionId"):
+        return jsonify({"msg":"regionId is required"}), 422
+
+    if not request.form.get("url", None):
+        return jsonify({"msg":"url is required"}), 422
+
+    if hasUserStorePhotoUrl and len(userStorePhotoUrl) == 0:
+        return jsonify({"msg":"userStorePhotoUrl is required"}), 422
+
+    if hasUserPhotoUrl and len(userPhotoUrl) == 0:
+        return jsonify({"msg":"userPhotoUrl is required"}), 422
+
+
+
+    #userId = request.form.get("userId")
+
+    login = Login.getOneById(userStore.user.login.id)
+    login.email = email
+    login.password = password
+    login.update()
+
+    user = User.getOneBy(userStore.user.id)
+    user.name = userName
+    user.birthDate = birthDate
+    user.nationalId = nationalId
+    user.phone = phone
+
+    userStore.name = userStoreName
+    userStore.regionId = regionId
+    userStore.bio = bio
+    userStore.url = url
+
+    userStore.save()
+
+    print('saveUserStoreById.userStore (after save):', userStore.serialize())
+    return jsonify(userStore.serialize()),200
 
 
 #Follower
@@ -794,7 +886,7 @@ def sitemap():
 
     #Login 1
     login1 = Login(email='juanita@gmail.com', password='1234')
-    user1 = User(name='User 1', loginId=1, photoUrl='/images/juanita.jpg', active=True)
+    user1 = User(name='User 1', loginId=1, photoUrl='/images/juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 982838393')
     userStore1 = UserStore(name='UserStore 1', regionId=13, userId=1, title='Title', bio='Bio', url='juanita', photoUrl='/images/tendita.png')
 
     login1.save()
@@ -803,7 +895,7 @@ def sitemap():
 
     #Login 2
     login2 = Login(email='juan@gmail.com', password='1234')
-    user2 = User(name='User 2', loginId=2, photoUrl='/images/juanita.jpg', active=True)
+    user2 = User(name='User 2', loginId=2, photoUrl='/images/juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 983838393')
     userStore2 = UserStore(name='UserStore 2', regionId=13, userId=2, title='Title', bio='Bio', url='juan', photoUrl='/images/tendita.png')
 
     login2.save()
@@ -812,7 +904,7 @@ def sitemap():
 
     #Login 3
     login3 = Login(email='pablo@gmail.com', password='1234')
-    user3 = User(name='User 3', loginId=3, photoUrl='/images/juanita.jpg', active=True)
+    user3 = User(name='User 3', loginId=3, photoUrl='/images/juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23163523k', phone='+56 945838393')
     userStore3 = UserStore(name='UserStore 3', regionId=13, userId=3, title='Title', bio='Bio', url='pablo', photoUrl='/images/tendita.png')  
 
     login3.save()
@@ -821,7 +913,7 @@ def sitemap():
 
     #Login 4
     login4 = Login(email='camila@gmail.com', password='1234')
-    user4 = User(name='User 4', loginId=4, photoUrl='/images/juanita.jpg', active=True)
+    user4 = User(name='User 4', loginId=4, photoUrl='/images/juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23112323k', phone='+56 983818493')
     userStore4 = UserStore(name='UserStore 4', regionId=13, userId=4, title='Title', bio='Bio', url='camila', photoUrl='/images/tendita.png')  
 
     login4.save()
