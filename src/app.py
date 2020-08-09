@@ -28,9 +28,6 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config['JWT_SECRET_KEY'] = 'secret-key'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-
-
-
 db.init_app(app)
 
 CORS(app)
@@ -97,7 +94,7 @@ def register():
     user = User(name=name, loginId=login.id, photoUrl=None, active=True, birthDate=None, nationalId=None, phone=None)
     user.save()
 
-    userStore = UserStore(name=name, userId=user.id, regionId=None, title='', bio='', url='', photoUrl=None)
+    userStore = UserStore(name=name, userId=user.id, regionId=None, bio='', url='', photoUrl=None)
     userStore.save()
     print('login=', login)
 
@@ -212,6 +209,9 @@ def addUserStoreId():
     name = request.json.get('name',None)
     userId = request.json.get('userId',None)
     regionId = request.json.get('regionId', None)
+    bio = request.json.get('regionId', None)
+    url = request.json.get('url', None)
+    photoUrl = request.json.get('photoUrl', None)
 
     print('name=', name, 'userId=', userId)
 
@@ -224,7 +224,7 @@ def addUserStoreId():
     if not regionId:
         return jsonify({"msg":"regionId is required"}), 422
 
-    userStore = UserStore(name, userId, regionId)
+    userStore = UserStore(name=name, userId=userId, regionId=regionId, bio=bio, url=url, photoUrl=photoUrl)
     #userStore.name = name
     #userStore.userId = userId
     #userStore.regionId = regionId
@@ -249,6 +249,9 @@ def getUserStoreById(id):
 @app.route('/my-store/<int:id>', methods=['PUT'])
 def saveUserStoreById(id):
     print("** appy.saveUserStoreById(id).request.method===>" ,  request.method)
+    print("** appy.saveUserStoreById(id).request===>" ,  request)
+    print("** appy.saveUserStoreById(id).request.files===>" ,  request.files)
+
     print("** appy.saveUserStoreById.id=",id) 
     userStore = UserStore.getOneUserStoreById(id)
     print("** appy.saveUserStoreById.userStore=",userStore) 
@@ -265,10 +268,9 @@ def saveUserStoreById(id):
     url = request.form.get("url", None)
     userStorePhotoUrl = request.form.get("userStorePhotoUrl", None)
     hasUserStorePhotoUrl = request.form.get("hasUserStorePhotoUrl") != 'false'
-    userPhotoUrl = request.form.get("userPhotoUrl", None)
+    userPhotoUrl = request.form.get("userPhoto", None)
     hasUserPhotoUrl = request.form.get("hasUserPhotoUrl") != 'false'
 
-    #birthDate = datetime.datetime.strptime(birthDate, '%d/%m/%y')
     print('>>>birthDate=', birthDate, type(birthDate))
     birthDateFormated= ''
     try:
@@ -284,28 +286,28 @@ def saveUserStoreById(id):
     if not userStore:
         return jsonify({"msg":"UserStore not found"}), 404
 
-    if not request.form.get("email"):
+    if not request.form.get("email", None):
         return jsonify({"msg":"email is required"}), 422
 
-    if not request.form.get("password"):
+    if not request.form.get("password", None):
         return jsonify({"msg":"password is required"}), 422
 
-    if not request.form.get("userName"):
+    if not request.form.get("userName", None):
         return jsonify({"msg":"userName is required"}), 422
 
-    if not request.form.get("birthDate"):
+    if not request.form.get("birthDate", None):
         return jsonify({"msg":"birthDate is required"}), 422
 
-    if not request.form.get("nationalId"):
+    if not request.form.get("nationalId", None):
         return jsonify({"msg":"nationalId is required"}), 422
 
-    if not request.form.get("phone"):
+    if not request.form.get("phone", None):
         return jsonify({"msg":"phone is required"}), 422
 
-    if not request.form.get("userStoreName"):
+    if not request.form.get("userStoreName", None):
         return jsonify({"msg":"userStoreName is required"}), 422
 
-    if not request.form.get("regionId"):
+    if not request.form.get("regionId", None):
         return jsonify({"msg":"regionId is required"}), 422
 
     if not request.form.get("url", None):
@@ -314,12 +316,25 @@ def saveUserStoreById(id):
     if hasUserStorePhotoUrl and len(userStorePhotoUrl) == 0:
         return jsonify({"msg":"userStorePhotoUrl is required"}), 422
 
-    if hasUserPhotoUrl and len(userPhotoUrl) == 0:
-        return jsonify({"msg":"userPhotoUrl is required"}), 422
+
+    if hasUserPhotoUrl: 
+        print('&&&&&isFileAllowed')
+
+        if 'userPhoto' not in request.files:
+            return jsonify({"msg": "userPhoto is required"}), 400
 
 
+        if not isFileAllowed('userPhotoUrl', userPhotoUrl):
+            msg = "User photo image {0} not allowed!".format('userPhotoUrl')
+            return jsonify({msg}), 400
+        saveImageFile(fileKey='userPhotoUrl', request=request, fileType="UserProfile", email=email)
 
-    #userId = request.form.get("userId")
+
+    if hasUserStorePhotoUrl:
+        if not isFileAllowed(fileKey='userStorePhotoUrl', request=request):
+            msg = "UserStore photo image {0} not allowed!".format('userStorePhotoUrl')
+            return jsonify({msg}), 400
+        saveImageFile(fileKey='userStorePhotoUrl', request=request, fileType="UserStore", email=email)
 
     login = Login.getOneById(userStore.user.login.id)
     login.email = email
@@ -341,6 +356,31 @@ def saveUserStoreById(id):
 
     print('saveUserStoreById.userStore (after save):', userStore.serialize())
     return jsonify(userStore.serialize()),200
+
+
+def isFileAllowed(fileKey, request):
+    print('>>>>>>>isFileAllowed.fileKey=', fileKey)
+    print('****isFileAllowed.request.files=', request.files[''])
+    file = request.files[fileKey]
+    print('>>>>>>>isFileAllowed.file.filename=', file.filename)
+    if not (file and allowed_file(file.filename, ALLOWED_EXTENSIONS_IMGS)):
+        return False
+    return True
+
+
+def saveImageFile(fileKey, request, fileType, email):
+    
+    file = request.files[fileKey]
+
+    login = Login.query.filter_by(email=email).first()
+    filename = secure_filename(file.filename)
+    filename = fileKey+"_" + str(login.id) + "_" + filename
+    print('saveImageFile.filename=',filename)
+    print('saveImageFile.filename.os=',os.path.join(app.config['UPLOAD_FOLDER']+"/images"))
+    
+    file.save(os.path.join(IMAGES_FOLDER, filename))
+    return filename
+
 
 
 #Follower
@@ -689,11 +729,15 @@ def saveProduct(id=None):
     hasBrand = False
     if hasBrand == 'true':
         hasBrand = True
-
+    print('>>>saveProduct.hasUpLoadPhotos.len(request.files)=', len(request.files))
     for i in range(len(request.files)):
+        print('#####saveProduct.hasUpLoadPhotos[i]=', i, hasUpLoadPhotos[i])
+
+        if not hasUpLoadPhotos[i]:
+            continue
         photo = 'photo'+str(i)
         if photo not in request.files:
-            msg = "{0} is required".format(photo)
+            msg = "{0} is required!".format(photo)
             return jsonify({"msg": msg}), 400 
         file = request.files[photo]
         if len(file.filename) == 0:
@@ -718,7 +762,6 @@ def saveProduct(id=None):
         print('saveProduct.filename=',filename)
         print('saveProduct.filename.os=',os.path.join(app.config['UPLOAD_FOLDER']+"/images"))
         
-        #file.save(os.path.join(app.config['UPLOAD_FOLDER']+"\\images\\", filename))
         file.save(os.path.join(IMAGES_FOLDER, filename))
         print('>>>>i=', i)
         hasUpLoadPhotos[i]=filename
@@ -767,7 +810,7 @@ def saveProduct(id=None):
 
 
 
-@app.route('/images-products/<filename>')
+@app.route('/images/<filename>')
 def image_profile(filename):
     return send_from_directory(IMAGES_FOLDER,filename)
 
@@ -886,8 +929,8 @@ def sitemap():
 
     #Login 1
     login1 = Login(email='juanita@gmail.com', password='1234')
-    user1 = User(name='User 1', loginId=1, photoUrl='/images/juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 982838393')
-    userStore1 = UserStore(name='UserStore 1', regionId=13, userId=1, title='Title', bio='Bio', url='juanita', photoUrl='/images/tendita.png')
+    user1 = User(name='User 1', loginId=1, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 982838393')
+    userStore1 = UserStore(name='UserStore 1', regionId=13, userId=1, bio='Bio', url='juanita', photoUrl='tendita.png')
 
     login1.save()
     user1.save()
@@ -895,8 +938,8 @@ def sitemap():
 
     #Login 2
     login2 = Login(email='juan@gmail.com', password='1234')
-    user2 = User(name='User 2', loginId=2, photoUrl='/images/juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 983838393')
-    userStore2 = UserStore(name='UserStore 2', regionId=13, userId=2, title='Title', bio='Bio', url='juan', photoUrl='/images/tendita.png')
+    user2 = User(name='User 2', loginId=2, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 983838393')
+    userStore2 = UserStore(name='UserStore 2', regionId=13, userId=2, bio='Bio', url='juan', photoUrl='tendita.png')
 
     login2.save()
     user2.save() 
@@ -904,8 +947,8 @@ def sitemap():
 
     #Login 3
     login3 = Login(email='pablo@gmail.com', password='1234')
-    user3 = User(name='User 3', loginId=3, photoUrl='/images/juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23163523k', phone='+56 945838393')
-    userStore3 = UserStore(name='UserStore 3', regionId=13, userId=3, title='Title', bio='Bio', url='pablo', photoUrl='/images/tendita.png')  
+    user3 = User(name='User 3', loginId=3, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23163523k', phone='+56 945838393')
+    userStore3 = UserStore(name='UserStore 3', regionId=13, userId=3, bio='Bio', url='pablo', photoUrl='tendita.png')  
 
     login3.save()
     user3.save()
@@ -913,8 +956,8 @@ def sitemap():
 
     #Login 4
     login4 = Login(email='camila@gmail.com', password='1234')
-    user4 = User(name='User 4', loginId=4, photoUrl='/images/juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23112323k', phone='+56 983818493')
-    userStore4 = UserStore(name='UserStore 4', regionId=13, userId=4, title='Title', bio='Bio', url='camila', photoUrl='/images/tendita.png')  
+    user4 = User(name='User 4', loginId=4, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23112323k', phone='+56 983818493')
+    userStore4 = UserStore(name='UserStore 4', regionId=13, userId=4, bio='Bio', url='camila', photoUrl='tendita.png')  
 
     login4.save()
     user4.save()
