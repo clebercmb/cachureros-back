@@ -2,7 +2,7 @@ import os, datetime
 from flask import Flask, request, jsonify, url_for, send_from_directory
 from flask_script import Manager 
 from flask_migrate import Migrate, MigrateCommand
-from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, Cart, CartProduct, WeightUnit, Region, Follow
+from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, Cart, CartProduct, WeightUnit, Region, Follow, MessageType, MessageStatus, UserMessage
 from flask_cors import CORS
 from utils import APIException, generate_sitemap, allowed_file
 from graphene import ObjectType, String, Schema
@@ -37,9 +37,7 @@ Migrate(app,db)
 manager = Manager(app)
 manager.add_command("db", MigrateCommand)
 
-products = [
-
-]
+products = []
 
 # Login
 @app.route('/login-all', methods=['GET'])
@@ -77,6 +75,111 @@ def login():
 
     return jsonify({"success": "Log In succesfully!", "data": data}), 200
 
+# User Messages
+@app.route("/user-message", methods=['POST'])  
+def saveUserMessage():
+    print('***saveUserMessage***')
+    print(request.json)    
+
+    senderId = request.json.get('senderId',None)
+    receiverId = request.json.get('receiverId',None)
+    messageTypeId = request.json.get('messageTypeId',None)
+    messageStatusId = request.json.get('messageStatusId',None)
+    message = request.json.get('message',None)
+    link = request.json.get('link',None)
+
+
+    print('>>>>saveUserMessage>> senderId=', senderId, 'receiverId=', receiverId, 'messageTypeId=', messageTypeId, 'messageStatusId=', messageStatusId, 'message=', message, 'link=', link)
+
+    if not senderId:
+        return jsonify({"msg":"senderId is required"}), 422
+
+    if not receiverId:
+        return jsonify({"msg":"receiverId is required"}), 422
+
+    if not messageTypeId:
+        return jsonify({"msg":"messageTypeId is required"}), 422
+    
+    if not messageStatusId:
+        return jsonify({"msg":"messageStatusId is required"}), 422
+    
+    if not message:
+        return jsonify({"msg":"message is required"}), 422
+
+    userMessage = UserMessage(senderId=senderId, receiverId=receiverId, messageTypeId=messageTypeId, messageStatusId=messageStatusId, message=message, link=link)
+
+    userMessage.save()
+    print('>>>>>userMessage.__dict__.keys()=', userMessage.__dict__.keys())
+
+    return jsonify(userMessage.serialize()),201
+
+@app.route("/user-message/<int:id>", methods=['DELETE'])  
+def deleteUserMessage(id):
+    print('***deleteUserMessage: id:', id)
+    #print(request.json)    
+
+    userMessage = UserMessage.getOneBy(id)
+
+    if not userMessage:
+        return jsonify({"msg":"Message {0} not found!".format(id)}), 404
+
+    print('***>>deleteUserMessage=', userMessage.serialize())
+
+    userMessage.delete()
+    print('***>>deleteUserMessage (after delete)=', userMessage)
+
+    user = userMessage.receiver
+    print('###deleteUserMessage.user.senders=', user.senders)
+
+    userMessagesList = list(map( lambda userMessage: userMessage.serialize(),  user.senders ))
+
+
+    return jsonify(userMessagesList),200
+
+@app.route("/user-message/<int:id>", methods=['GET'])  
+def getUserMessage(id):
+    print('***getUserMessage: id:', id)
+    print(request.json)    
+
+    userMessage = UserMessage.getOneBy(id)
+
+    if not userMessage:
+        return jsonify({"msg":"Message {0} not found!".format(id)}), 404
+
+    print('***>>getUserMessage.userMessage=', userMessage.serialize())
+
+    return jsonify(userMessage.serialize()),200
+
+
+@app.route("/user-message/", methods=['GET'])  
+def getAllUsersMessages():
+    print('***getAllUsersMessages')
+    print(request.json)    
+
+    userMessages = UserMessage.getAll()
+
+    print('***>>getAllUsersMessages.userMessages=', userMessages)
+
+    userMessagesList = list(map( lambda userMessage: userMessage.serialize(), userMessages ))
+
+    return jsonify(userMessagesList),200
+
+
+@app.route("/user-message/user/<int:id>", methods=['GET'])  
+def getUserMessageByReceivedId(id):
+    print('***getUserMessageByReceivedId: id:', id)
+    print(request.json)    
+
+    userMessages = UserMessage.getAllByReceivedId(id)
+
+    print('getUserMessageByUseriD.userMessages=', userMessages)
+
+    userMessagesList = list(map( lambda userMessage: userMessage.serialize(), userMessages ))
+
+    return jsonify(userMessagesList),200
+
+
+# Register New User
 @app.route('/register', methods=['POST'])
 def register():
     print("** register **")
@@ -387,14 +490,13 @@ def saveImageFile(fileKey, request, fileType, email):
 @app.route('/followed/<int:id>', methods=['GET'])
 def getFollowedByUserId(id):
     print("** getFollowedByUserId(id).request.method===>" ,  request.method)
-    followed = Follower.getAllFollower()
+    followed = Follow.getAllFollower()
     print("** getFollowedByUserId(id).followed=",followed) 
 
     #if userStore:
     #    return jsonify(userStore.serialize_with_product()), 200
     #else:
     #    return jsonify({"msg":"UserStore not found"}), 404
-
 
 @app.route("/follower", methods=['POST'])  
 def addFollower():
@@ -413,11 +515,11 @@ def addFollower():
     if not followedId:
         return jsonify({"msg":"followedId is required"}), 422
 
-    follower = Follower(followerId, followedId)
+    follow = Follow(followerId, followedId)
     
-    follower.save()
+    follow.save()
 
-    return jsonify(follower.serialize()),201
+    return jsonify(follow.serialize()),201
 
 
 # Department
@@ -725,7 +827,6 @@ def saveProduct(id=None):
 
     print('>>>saveProduct.hasUpLoadPhotos (after)=', hasUpLoadPhotos)
 
-
     hasBrand = False
     if hasBrand == 'true':
         hasBrand = True
@@ -926,6 +1027,18 @@ def sitemap():
     department4.save()
     department5.save()
     department6.save()
+
+    #MessageType
+    messageType1 = MessageType(name='duda')
+    messageType2 = MessageType(name='oferta')
+    messageType1.save()
+    messageType2.save()
+
+    #MessageStatus
+    messageStatus1 = MessageStatus(name='nueva')
+    messageStatus2 = MessageStatus(name='leido')
+    messageStatus1.save()
+    messageStatus2.save()
 
     #Login 1
     login1 = Login(email='juanita@gmail.com', password='1234')
