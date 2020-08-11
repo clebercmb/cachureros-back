@@ -50,7 +50,6 @@ class Login(db.Model):
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt 
         }  
- 
 
     def save(self):
         db.session.add(self)
@@ -78,15 +77,14 @@ class Login(db.Model):
         return login 
 
 
-
 class Follow(db.Model):
     __tablename__ = 'Follow'
 
-    followerId = Column(Integer, ForeignKey('User.id'), primary_key = True )   
-    followedId = Column(Integer, ForeignKey('User.id'), primary_key = True)    
+    followerId = db.Column(Integer, ForeignKey('User.id'), primary_key = True )   
+    followedId = db.Column(Integer, ForeignKey('User.id'), primary_key = True)    
 
-    createdAt = Column(DateTime)
-    modifiedAt  = Column(DateTime)
+    createdAt = db.Column(DateTime)
+    modifiedAt = db.Column(DateTime)
 
     # class constructor
     def __init__(self, follower, followed):
@@ -133,6 +131,107 @@ class Follow(db.Model):
         print('****models.Follower.followers=',followers)
         return followers
 
+# MessageType
+class MessageType(db.Model):
+    __tablename__ = 'MessageType'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), unique=True)
+
+    createdAt = Column(DateTime)
+    modifiedAt  = Column(DateTime)
+
+    # class constructor
+    def __init__(self, name):
+        """
+        Class constructor
+        """
+        self.name = name
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
+    def __rep__(self):
+        return "MessageType %r>" % self.name
+
+    def serialize(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt 
+        } 
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getOneById(id):
+        return MessageType.query.get(id)
+
+    @staticmethod
+    def getAll(userId):
+        messageTypes = MessageType.query.all()
+        return messageTypes
+
+# MessageStatus
+class MessageStatus(db.Model):
+    __tablename__ = 'MessageStatus'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), unique=True)
+
+    createdAt = Column(DateTime)
+    modifiedAt  = Column(DateTime)
+
+    # class constructor
+    def __init__(self, name):
+        """
+        Class constructor
+        """
+        self.name = name
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
+    def __rep__(self):
+        return "MessageStatus %r>" % self.name
+
+    def serialize(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt 
+        } 
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getOneById(id):
+        return MessageStatus.query.get(id)
+
+    @staticmethod
+    def getAll(userId):
+        messageStatus = MessageStatus.query.all()
+        return messageTypes
+
+
 
 class User(db.Model):
     __tablename__ = 'User'
@@ -143,13 +242,14 @@ class User(db.Model):
     login = relationship(Login)
     photoUrl=Column(String(100), default = 'tendita.png')
 
-    #followedList = db.relationship("Follower", backref="User", lazy=True, uselist=False)
-    #followerList = db.relationship("Follower", backref="User", lazy=True, uselist=False)
-
-    #followedList = relationship("Follower", backref="User", lazy=True, uselist=False, secondary="Follower")
     followeds = db.relationship(Follow, foreign_keys=[Follow.followerId], backref=db.backref('follower', lazy='joined'),lazy='dynamic', cascade='all, delete-orphan')
     
     followers = db.relationship(Follow, foreign_keys=[Follow.followedId], backref=db.backref('followed', lazy='joined'),lazy='dynamic', cascade='all, delete-orphan')
+
+    receivers = db.relationship("UserMessage", foreign_keys="UserMessage.senderId", backref=db.backref('senderUser', lazy='joined'),lazy='subquery', cascade='all, delete-orphan')
+        
+    senders = db.relationship("UserMessage", foreign_keys="UserMessage.receiverId", backref=db.backref('receiverUser', lazy='joined'),lazy='subquery', cascade='all, delete-orphan')
+
 
     userStore = db.relationship("UserStore", backref="User", lazy=True, uselist=False)
 
@@ -254,6 +354,26 @@ class User(db.Model):
             'modifiedAt': self.modifiedAt
         }    
 
+    def serialize_with_userMessages(self):
+        print('****User.serialize_with_userMessages.self.receivers:', self.receivers.all())
+        print('****User.serialize_with_userMessages.self.senders:', self.senders.all())
+        receivers = list(map(lambda receiver: receiver.serialize(), self.receivers.all()))
+        senders = list(map(lambda sender: sender.serialize(), self.senders.all()))
+        return {
+            'id': self.id,
+            'name': self.name,
+            'login': self.login.serialize(),
+            'photoUrl': self.photoUrl,
+            'receivers': receivers,
+            'senders': senders,
+            'active': self.active,
+            'birthDate': self.birthDate,
+            'nationalId': self.nationalId,
+            'phone': self.phone,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt
+        }    
+
     def save(self):
         db.session.add(self)
         db.session.commit()
@@ -316,6 +436,99 @@ class User(db.Model):
         print('****User.get_followers_by_id.followers:', followers)
 
         return followers  
+
+
+# UserMessage
+class UserMessage(db.Model):
+    __tablename__ = 'UserMessage'
+    id = Column(Integer, primary_key=True)
+    senderId = db.Column(Integer, ForeignKey(User.id), nullable = False)   
+    receiverId = db.Column(Integer, ForeignKey(User.id), nullable = False)    
+    messageTypeId = db.Column(Integer, ForeignKey(MessageType.id), nullable = False)    
+    messageStatusId = db.Column(Integer, ForeignKey(MessageStatus.id), nullable = False)
+
+    messageType = relationship(MessageType, lazy='select')
+    messageStatus = relationship(MessageStatus, lazy='select')
+
+    message = db.Column(String(250), nullable = False)
+    link = db.Column(String(250))
+
+    sender = db.relationship("User", foreign_keys=[senderId])
+    receiver = db.relationship("User", foreign_keys=[receiverId])
+
+
+    createdAt = db.Column(DateTime)
+    modifiedAt  = db.Column(DateTime)
+
+
+    # class constructor
+    def __init__(self, senderId, receiverId, messageTypeId, messageStatusId, message, link):
+        """
+        Class constructor
+        """
+        self.senderId = senderId
+        self.receiverId = receiverId
+        self.messageTypeId = messageTypeId
+        self.messageStatusId = messageStatusId
+        self.message = message
+        self.link = link
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+#        self.sender = db.relationship("User", foreign_keys=[UserMessage.senderId])
+#        self.receiver = db.relationship("User", foreign_keys=[UserMessage.receiverId])
+
+
+    def __rep__(self):
+        return "UserMessage %r>" % self.id
+
+    def serialize(self):
+        createdAt = self.createdAt
+        if createdAt == None:
+            createdAt=''
+        else:
+            createdAt = createdAt.strftime('%d/%m/%Y %H:%M:%S')
+
+        return {
+            'id': self.id,
+            'senderId': self.senderId,
+            'receiverId': self.receiverId,
+            'sender': self.sender.serialize(),
+            'receiver': self.receiver.serialize(),
+            'messageType': self.messageType.serialize(),
+            'messageStatus': self.messageStatus.serialize(),
+            'message': self.message,
+            'link': self.link,
+            'createdAt': createdAt,
+            'modifiedAt': self.modifiedAt             
+        }        
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.committ()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+        
+    @staticmethod
+    def getOneBy(id):
+        return UserMessage.query.get(id)
+
+    @staticmethod
+    def getAllByReceivedId(userId):
+        userMessages = UserMessage.query.filter_by(receiverId=userId).all()
+        return userMessages
+
+    @staticmethod
+    def getAll():
+        userMessages = UserMessage.query.all()
+        return userMessages
+
+
 
 class Region(db.Model):
     __tablename__ = 'Region'
