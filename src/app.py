@@ -937,7 +937,7 @@ def getCartWithProducts(userId):
 
     if not cart:
         return jsonify({"msg":"Cart not found"}), 404
-        
+
     return jsonify(cart.serialize_with_products()), 200
 
 
@@ -972,19 +972,22 @@ def getCartProductByUserId(user_id):
     cartsList = list(map( lambda cartProduct: cartProduct.serialize(), cartsproduct ))
     return jsonify(cartsList), 200
 
-
-@app.route("/cartproduct/<int:user_id>", methods=['POST'])  
-def addCartProduct(user_id):
+@app.route("/cart-product/<int:id>", methods=['PUT'])  
+@app.route("/cart-product/", methods=['POST'])  
+def addCartProduct(id):
     print('***addCartProduct***')
     print(request.json)    
 
+    cartId = request.json.get('cartId',None)
     price = request.json.get('price',None)
     amount = request.json.get('amount',None)
     productId = request.json.get('productId',None)
     cartId = request.json.get('cartId',None)
 
+    print('***addCartProduct => cartId=', cartId, 'price=', price, 'amount=', amount, 'productId=', productId, 'cartId=', cartId)
 
-    print('price=', price, 'amount=', amount, 'productId=', productId, 'cartId=', cartId)
+    if not cartId:
+        return jsonify({"msg":"cartId is required"}), 422
 
     if not price:
         return jsonify({"msg":"price is required"}), 422
@@ -995,17 +998,27 @@ def addCartProduct(user_id):
     if not productId:
         return jsonify({"msg":"productId is required"}), 422
 
-    if not cartId:
-        return jsonify({"msg":"cartId is required"}), 422
+    cart = Cart.getOneById(cartId)
+    product = Product.getOneById(productId)
 
-    cartproduct = CartProduct()
-    cartproduct.price = price
-    cartproduct.amount = amount
-    cartproduct.productId = productId
-    cartproduct.cartId = cartId
-    
-    db.session.add(cartproduct)
-    db.session.commit()
+    if not cart:
+        return jsonify({"msg":"Cart not found"}), 404
+
+    if not product:
+        return jsonify({"msg":"Product not found"}), 404
+
+    cartproduct=None
+    if id:
+        cartproduct = CartProduct.getOneById(id)
+        if not cartproduct:
+            return jsonify({"msg":"CartProduct not found"}), 404
+        cartproduct.price = price
+        cartproduct.amount = amount
+        cartproduct.update()
+    else:        
+        cartproduct = CartProduct(cartId=cart.id, price=price, amount=amount, productId=product.id)
+        cartproduct.save()
+
     return jsonify(cartproduct.serialize()),201
 
 
