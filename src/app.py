@@ -197,6 +197,9 @@ def register():
     user = User(name=name, loginId=login.id, photoUrl=None, active=True, birthDate=None, nationalId=None, phone=None)
     user.save()
 
+    cart = Cart(userId=user.id)
+    cart.save()
+
     userStore = UserStore(name=name, userId=user.id, regionId=None, bio='', url='', photoUrl=None)
     userStore.save()
     print('login=', login)
@@ -917,31 +920,38 @@ def image_profile(filename):
 
 
 # Cart
-@app.route('/cart/<int:user_id>', methods=['GET'])
-def getCart(user_id):
+@app.route('/cart/<int:userId>', methods=['GET'])
+def getCart(userId):
     print("** getCart **")
-    carts = Cart.query.all()
-    cartsList = list(map( lambda cart: cart.serialize(), carts ))
-    return jsonify(cartsList), 200
+    cart = Cart.getOneById(userId)
+
+    if not cart:
+        return jsonify({"msg":"Cart not found"}), 404
+
+    return jsonify(cart.serialize()), 200
+
+@app.route('/cart-with-products/<int:userId>', methods=['GET'])
+def getCartWithProducts(userId):
+    print("** getCart **")
+    cart = Cart.getOneById(userId)
+
+    if not cart:
+        return jsonify({"msg":"Cart not found"}), 404
+        
+    return jsonify(cart.serialize_with_products()), 200
 
 
-@app.route("/cart/<int:user_id>", methods=['POST'])  
-def addCart(user_id):
+@app.route("/cart/<int:userId>", methods=['POST'])  
+def addCart(userId):
     print('***addCart***')
     print(request.json)    
 
-    userId = user_id
-
-
     print('userId=', userId)
-
 
     if not userId:
         return jsonify({"msg":"userId is required"}), 422
 
-
-
-    cart = Cart()
+    cart = Cart(user.id)
     cart.userId = userId
     
     db.session.add(cart)
@@ -949,8 +959,14 @@ def addCart(user_id):
     return jsonify(cart.serialize()),201
 
 # CartProduct
-@app.route('/cartproduct/<int:user_id>', methods=['GET'])
-def getCartProduct(user_id):
+@app.route('/cart-product/<int:id>', methods=['GET'])
+def getCartProduct(id):
+    print("** getCartProduct **")
+    cartProduct = CartProduct.getOneById(id)
+    return jsonify(cartProduct.serialize()), 200
+
+@app.route('/cart-product/<int:user_id>', methods=['GET'])
+def getCartProductByUserId(user_id):
     print("** getCartProduct **")
     cartsproduct = CartProduct.query.all()
     cartsList = list(map( lambda cartProduct: cartProduct.serialize(), cartsproduct ))
@@ -1043,37 +1059,45 @@ def sitemap():
     #Login 1
     login1 = Login(email='juanita@gmail.com', password='1234')
     user1 = User(name='User 1', loginId=1, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 982838393')
+    cart1 = Cart(1)
     userStore1 = UserStore(name='UserStore 1', regionId=13, userId=1, bio='Bio', url='juanita', photoUrl='tendita.png')
 
     login1.save()
     user1.save()
+    cart1.save()
     userStore1.save()
 
     #Login 2
     login2 = Login(email='juan@gmail.com', password='1234')
     user2 = User(name='User 2', loginId=2, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 983838393')
+    cart2 = Cart(2)
     userStore2 = UserStore(name='UserStore 2', regionId=13, userId=2, bio='Bio', url='juan', photoUrl='tendita.png')
 
     login2.save()
-    user2.save() 
+    user2.save()
+    cart2.save()
     userStore2.save()
 
     #Login 3
     login3 = Login(email='pablo@gmail.com', password='1234')
     user3 = User(name='User 3', loginId=3, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23163523k', phone='+56 945838393')
+    cart3 = Cart(3)
     userStore3 = UserStore(name='UserStore 3', regionId=13, userId=3, bio='Bio', url='pablo', photoUrl='tendita.png')  
 
     login3.save()
     user3.save()
+    cart3.save()
     userStore3.save()
 
     #Login 4
     login4 = Login(email='camila@gmail.com', password='1234')
     user4 = User(name='User 4', loginId=4, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23112323k', phone='+56 983818493')
+    cart4 = Cart(4)
     userStore4 = UserStore(name='UserStore 4', regionId=13, userId=4, bio='Bio', url='camila', photoUrl='tendita.png')  
 
     login4.save()
     user4.save()
+    cart4.save()
     userStore4.save()
 
     # Follows
@@ -1110,6 +1134,15 @@ def sitemap():
 
     product4 = Product(name="Product 4", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_0.png", "image_1.png","image_2.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
     product4.save()
+
+
+    cartProduct1 = CartProduct(cartId=1, price=10000, amount=1, productId=1)
+    cartProduct2 = CartProduct(cartId=1, price=10000, amount=1, productId=2)
+    cartProduct3 = CartProduct(cartId=2, price=10000, amount=1, productId=1)
+
+    cartProduct1.save()
+    cartProduct2.save()
+    cartProduct3.save()
 
     return 'Tables filled'
 
