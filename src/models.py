@@ -940,6 +940,20 @@ class Cart(db.Model):
     userId = Column(Integer, ForeignKey('User.id'))
     user = relationship(User)
 
+    products = relationship("CartProduct", backref="Cart", lazy=True)
+
+    createdAt = Column(DateTime)
+    modifiedAt  = Column(DateTime)
+
+    # class constructor
+    def __init__(self, userId):
+        """
+        Class constructor
+        """
+        self.userId = userId
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
     def __rep__(self):
         return "Cart %r>" % self.id
 
@@ -948,6 +962,37 @@ class Cart(db.Model):
             "id": self.id,
             "User": self.user.serialize()
         }   
+
+    def serialize_with_products(self):
+        print('****Cart.serialize_with_product.products:', self.products)
+        products = list(map(lambda product: product.serialize(), self.products))
+
+        return {
+            "id": self.id,
+            "User": self.user.serialize(),
+            'products': products
+        }   
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getOneById(id):
+        return Cart.query.get(id)
+
+    @staticmethod
+    def getAl():
+        return Cart.query.all()
+
 
 class CartProduct(db.Model):
     __tablename__ = 'CartProduct'
@@ -961,6 +1006,21 @@ class CartProduct(db.Model):
     productId = Column(Integer, ForeignKey('Product.id'))
     product = relationship(Product)
 
+    createdAt = Column(DateTime)
+    modifiedAt  = Column(DateTime)
+
+    # class constructor
+    def __init__(self, cartId, price, amount, productId):
+        """
+        Class constructor
+        """
+        self.cartId = cartId
+        self.productId = productId
+        self.price = price
+        self.amount = amount
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
     def __rep__(self):
         return "CartProduct %r>" % self.id
 
@@ -971,8 +1031,8 @@ class CartProduct(db.Model):
             "amount": self.amount,
             "Cart": self.cart.serialize(),
             "Product": self.product.serialize(),
-            'productState': self.productState.serialize(),
-            'weightUnit': self.weightUnit.serialize()
+            "createdAt": self.createdAt,
+            "modifiedAt": self.modifiedAt
         }   
 
     def save(self):
@@ -989,9 +1049,71 @@ class CartProduct(db.Model):
 
     @staticmethod
     def getAll():
-        return Product.query.all()
+        return CartProduct.query.all()
 
     @staticmethod
     def getOneById(id):
-        return Product.query.get(id)
+        return CartProduct.query.get(id)
 
+# Orders
+class OrderStatus(db.Model):
+    __tablename__ = 'OrderStatus'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), unique=True)
+    createdAt = Column(DateTime)
+    modifiedAt  = Column(DateTime)
+
+    # class constructor
+    def __init__(self, name):
+        """
+        Class constructor
+        """
+        self.name = name
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
+    def __rep__(self):
+        return "Login %r>" % self.name
+
+    def serialize(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt 
+        } 
+    def serialize_with_user(self):
+        print('****Login.serialize_with_user:', self.user)
+        return {
+            'id': self.id,
+            'email': self.email,
+            'password': self.password,
+            'user': self.user.serialize(),
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt 
+        }  
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getOneById(id):
+        return Login.query.get(id)
+
+    @staticmethod
+    def get_all_login():
+        return Login.query.all()
+
+    @staticmethod
+    def get_login_by_email(email):
+        login = Login.query.filter_by(email=email).first()
+        return login 
