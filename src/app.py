@@ -1030,6 +1030,15 @@ def getOrder(id):
 
     return jsonify(order.serialize()), 200
 
+@app.route('/order/user/<int:id>', methods=['GET'])
+def getOrderByUserId(id):
+    print("** getOrderByUserId **")
+    orders = Order.getAllByUserId(id)
+
+    ordersList = list(map( lambda order: order.serialize(), orders ))
+    return jsonify(ordersList), 200
+
+
 @app.route('/order/<int:id>', methods=['DELETE'])
 def deleteOrder(id):
     print("** getOrder **")
@@ -1098,8 +1107,18 @@ def addOrder():
         return jsonify({"msg":"OrderStatus not found"}), 404
 
     order = Order(user=user, region=region, orderStatus=orderStatus, totalPrice=2000, flete=flete, address=address)
-    
-    order.save()
+
+    productsToBeSaved = []
+    for orderProduct in products:
+        print('>>>orderProduct=', orderProduct)
+        product = Product.getOneById(orderProduct['productId'])
+        if not product:
+            return jsonify({"msg":"Product {0} not found!".format(orderProduct['productId'])}), 404
+
+        newProduct = OrderProduct(order=order, product=product, price=orderProduct['price'], amount=orderProduct['amount'])
+        productsToBeSaved.append(newProduct)
+
+    order.save(productsToBeSaved)
     return jsonify(order.serialize()),201
 
 # OrderProduct
@@ -1323,7 +1342,7 @@ def sitemap():
 
     order1 = Order(user=user1, orderStatus=orderStatus1, region=region1, totalPrice=2000, flete=1000, address='Addresses 1')
     order1.save()
- 
+
     orderProduct1 = OrderProduct(order=order1, product=product1, price=2000, amount=3)
     orderProduct1.save()
 
