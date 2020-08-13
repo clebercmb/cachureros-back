@@ -2,7 +2,7 @@ import os, datetime
 from flask import Flask, request, jsonify, url_for, send_from_directory
 from flask_script import Manager 
 from flask_migrate import Migrate, MigrateCommand
-from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, Cart, CartProduct, WeightUnit, Region, Follow, MessageType, MessageStatus, UserMessage
+from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, Cart, CartProduct, WeightUnit, Region, Follow, MessageType, MessageStatus, UserMessage, Order, OrderProduct, OrderStatus
 from flask_cors import CORS
 from utils import APIException, generate_sitemap, allowed_file
 from graphene import ObjectType, String, Schema
@@ -133,7 +133,6 @@ def deleteUserMessage(id):
 
     userMessagesList = list(map( lambda userMessage: userMessage.serialize(),  user.senders ))
 
-
     return jsonify(userMessagesList),200
 
 @app.route("/user-message/<int:id>", methods=['GET'])  
@@ -228,7 +227,7 @@ def getAllUsers():
 @app.route('/user/<int:id>', methods=['GET'])
 def getUser(id):
     print("** getUser **")
-    user = User.getOneBy(id)
+    user = User.getOneById(id)
     print('>>>user=', user)
 
     print('>>>user.followeds=', user.getFolloweds())
@@ -447,7 +446,7 @@ def saveUserStoreById(id):
     login.password = password
     login.update()
 
-    user = User.getOneBy(userStore.user.id)
+    user = User.getOneById(userStore.user.id)
     user.name = userName
     user.birthDate = birthDate
     user.nationalId = nationalId
@@ -932,7 +931,7 @@ def getCart(userId):
 
 @app.route('/cart-with-products/<int:userId>', methods=['GET'])
 def getCartWithProducts(userId):
-    print("** getCart **")
+    print("** getCartWithProducts **")
     cart = Cart.getOneById(userId)
 
     if not cart:
@@ -967,14 +966,14 @@ def getCartProduct(id):
 
 @app.route('/cart-product/<int:user_id>', methods=['GET'])
 def getCartProductByUserId(user_id):
-    print("** getCartProduct **")
+    print("** getCartProductByUserId **")
     cartsproduct = CartProduct.query.all()
     cartsList = list(map( lambda cartProduct: cartProduct.serialize(), cartsproduct ))
     return jsonify(cartsList), 200
 
 @app.route("/cart-product/<int:id>", methods=['PUT'])  
 @app.route("/cart-product/", methods=['POST'])  
-def addCartProduct(id):
+def addCartProduct(id=None):
     print('***addCartProduct***')
     print(request.json)    
 
@@ -982,9 +981,8 @@ def addCartProduct(id):
     price = request.json.get('price',None)
     amount = request.json.get('amount',None)
     productId = request.json.get('productId',None)
-    cartId = request.json.get('cartId',None)
 
-    print('***addCartProduct => cartId=', cartId, 'price=', price, 'amount=', amount, 'productId=', productId, 'cartId=', cartId)
+    print('***addCartProduct => cartId=', cartId, 'price=', price, 'amount=', amount, 'productId=', productId)
 
     if not cartId:
         return jsonify({"msg":"cartId is required"}), 422
@@ -1016,31 +1014,187 @@ def addCartProduct(id):
         cartproduct.amount = amount
         cartproduct.update()
     else:        
-        cartproduct = CartProduct(cartId=cart.id, price=price, amount=amount, productId=product.id)
+        cartproduct = CartProduct(cart=cart, price=price, amount=amount, product=product)
         cartproduct.save()
 
     return jsonify(cartproduct.serialize()),201
+
+# Order
+@app.route('/order/<int:id>', methods=['GET'])
+def getOrder(id):
+    print("** getOrder **")
+    order = Order.getOneById(id)
+
+    if not order:
+        return jsonify({"msg":"Order not found"}), 404
+
+    return jsonify(order.serialize()), 200
+
+@app.route('/order/<int:id>', methods=['DELETE'])
+def deleteOrder(id):
+    print("** getOrder **")
+    order = Order.getOneById(id)
+
+    if not order:
+        return jsonify({"msg":"Order not found"}), 404
+
+    #print('>>deleteOrder.order=', order.serialize())
+    order.delete()
+
+    return jsonify(order.serialize()),200
+
+
+@app.route('/order-with-products/<int:id>', methods=['GET'])
+def getOrdertWithProducts(id):
+    print("** getOrdertWithProducts **")
+    order = Order.getOneById(id)
+
+    if not order:
+        return jsonify({"msg":"Order not found"}), 404
+
+    return jsonify(order.serialize_with_products()), 200
+
+@app.route("/order/", methods=['POST'])  
+def addOrder():
+    print('***addOrder***')
+    print(request.json)    
+
+    userId = request.json.get('userId',None)
+    regionId = request.json.get('regionId', None)
+    products = request.json.get('products', None)
+    flete = request.json.get('flete', None)
+    address = request.json.get('address', None)
+
+    if not userId:
+        return jsonify({"msg":"userId is required"}), 422
+
+    if not regionId:
+        return jsonify({"msg":"regionId is required"}), 422
+
+    if not products:
+        return jsonify({"msg":"products is required"}), 422
+
+    if not flete:
+        return jsonify({"msg":"flete is required"}), 422
+
+    if not address:
+        return jsonify({"msg":"address is required"}), 422
+
+    user = User.getOneById(userId)
+    region = Region.getOneById(regionId)
+    orderStatus = OrderStatus.getOneById(1)
+
+    print('>>addOrder.user=', user)
+    print('>>addOrder.region=', region)
+    print('>>addOrder.orderStatus=', orderStatus)
+
+    if not user:
+        return jsonify({"msg":"User not found"}), 404
+
+    if not region:
+        return jsonify({"msg":"Region not found"}), 404
+
+    if not orderStatus:
+        return jsonify({"msg":"OrderStatus not found"}), 404
+
+    order = Order(user=user, region=region, orderStatus=orderStatus, totalPrice=2000, flete=flete, address=address)
+    
+    order.save()
+    return jsonify(order.serialize()),201
+
+# OrderProduct
+@app.route('/order-product/<int:id>', methods=['GET'])
+def getOrderProduct(id):
+    print("** getOrderProduct **")
+    orderProduct = OrderProduct.getOneById(id)
+    return jsonify(orderProduct.serialize()), 200
+
+
+@app.route("/order-product/<int:id>", methods=['PUT'])  
+@app.route("/order-product/", methods=['POST'])  
+def addOrderProduct(id=None):
+    print('***addOrderProduct***')
+    print(request.json)    
+
+    orderId = request.json.get('orderId',None)
+    price = request.json.get('price',None)
+    amount = request.json.get('amount',None)
+    productId = request.json.get('productId',None)
+
+    print('***addOrderProduct => orderId=', orderId, 'price=', price, 'amount=', amount, 'productId=', productId)
+
+    if not orderId:
+        return jsonify({"msg":"orderId is required"}), 422
+
+    if not price:
+        return jsonify({"msg":"price is required"}), 422
+
+    if not amount:
+        return jsonify({"msg":"amount is required"}), 422
+
+    if not productId:
+        return jsonify({"msg":"productId is required"}), 422
+
+    order = Order.getOneById(orderId)
+    product = Product.getOneById(productId)
+
+    if not order:
+        return jsonify({"msg":"Order not found"}), 404
+
+    if not product:
+        return jsonify({"msg":"Product not found"}), 404
+
+    orderproduct=None
+    if id:
+        orderproduct = OrderProduct.getOneById(id)
+        if not orderproduct:
+            return jsonify({"msg":"OrderProduct not found"}), 404
+        orderproduct.price = price
+        orderproduct.amount = amount
+        orderproduct.update()
+    else:        
+        orderproduct = OrderProduct(order=order, price=price, amount=amount, product=product)
+        orderproduct.save()
+
+    return jsonify(orderproduct.serialize()),201
 
 
 # generate sitemap with all your endpoints
 @app.route('/')
 def sitemap():
-    db.session.add(Region(code='01', name='Tarapac\u00e1'))
-    db.session.add(Region(code='02', name='Antofagasta'))
-    db.session.add(Region(code='03', name='Atacama'))
-    db.session.add(Region(code='04', name='Coquimbo'))
-    db.session.add(Region(code='05', name='Valparaíso'))
-    db.session.add(Region(code='06', name='O\u2019Higgins'))
-    db.session.add(Region(code='07', name='Maule'))
-    db.session.add(Region(code='08', name='Biob\u00edo'))
-    db.session.add(Region(code='09', name='Araucan\u00eda'))
-    db.session.add(Region(code='10', name='Los Lagos'))
-    db.session.add(Region(code='11', name='Ays\u00e9n'))
-    db.session.add(Region(code='12', name='Magallanes'))
-    db.session.add(Region(code='13', name='Metropolitana de Santiago'))
-    db.session.add(Region(code='14', name='Los R\u00edos'))
-    db.session.add(Region(code='15', name='Arica y Parinacota'))
-    db.session.add(Region(code='16', name='\u00d1uble'))
+    region1 = Region(code='01', name='Tarapac\u00e1')
+    region2 = Region(code='02', name='Antofagasta')
+    region3 = Region(code='03', name='Atacama')
+    region4 = Region(code='04', name='Coquimbo')
+    region5 = Region(code='05', name='Valparaíso')
+    region6 = Region(code='06', name='O\u2019Higgins')
+    region7 = Region(code='07', name='Maule')
+    region8 = Region(code='08', name='Biob\u00edo')
+    region9 = Region(code='09', name='Araucan\u00eda')
+    region10 = Region(code='10', name='Los Lagos')
+    region11 = Region(code='11', name='Ays\u00e9n')
+    region12 = Region(code='12', name='Magallanes')
+    region13 = Region(code='13', name='Metropolitana de Santiago')
+    region14 = Region(code='14', name='Los R\u00edos')
+    region15 = Region(code='15', name='Arica y Parinacota')
+    region16 = Region(code='16', name='\u00d1uble')
+
+    region1.save()
+    region2.save()
+    region3.save()
+    region4.save()
+    region5.save()
+    region6.save()
+    region7.save()
+    region8.save()
+    region9.save()
+    region10.save()
+    region11.save()
+    region12.save()
+    region13.save()
+    region14.save()
+    region15.save()
+    region16.save()
 
     #Department
     department1 = Department(name='Hogar')
@@ -1156,6 +1310,22 @@ def sitemap():
     cartProduct1.save()
     cartProduct2.save()
     cartProduct3.save()
+
+    orderStatus1 = OrderStatus(name='Pendiente Pago')
+    orderStatus2 = OrderStatus(name='Pendiente Entrega')
+    orderStatus3 = OrderStatus(name='En evaluacion del pago')
+    orderStatus4 = OrderStatus(name='Entregue')
+
+    orderStatus1.save()
+    orderStatus2.save()
+    orderStatus3.save()
+    orderStatus4.save()
+
+    order1 = Order(user=user1, orderStatus=orderStatus1, region=region1, totalPrice=2000, flete=1000, address='Addresses 1')
+    order1.save()
+ 
+    orderProduct1 = OrderProduct(orderId=order1, productId=product1, price=2000, amount=3)
+    orderProduct1.save()
 
     return 'Tables filled'
 

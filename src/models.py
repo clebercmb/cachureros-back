@@ -7,6 +7,7 @@ import datetime
 
 db = SQLAlchemy()
 
+
 class Login(db.Model):
     __tablename__ = 'Login'
     id = Column(Integer, primary_key=True)
@@ -414,7 +415,7 @@ class User(db.Model):
         return  followers
 
     @staticmethod
-    def getOneBy(id):
+    def getOneById(id):
         return User.query.get(id)
 
     @staticmethod
@@ -532,9 +533,21 @@ class UserMessage(db.Model):
 
 class Region(db.Model):
     __tablename__ = 'Region'
-    id = Column(Integer, primary_key=True)
-    code = Column(String(2), nullable = False)
-    name = Column(String(100), nullable = False)
+    id = db.Column(Integer, primary_key=True)
+    code = db.Column(String(2), nullable = False)
+    name = db.Column(String(100), nullable = False)
+    createdAt = db.Column(DateTime)
+    modifiedAt = db.Column(DateTime)
+
+        # class constructor
+    def __init__(self, name, code):
+        """
+        Class constructor
+        """
+        self.name = name
+        self.code = code
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
 
     def __rep__(self):
         return "Region %r>" % self.name
@@ -543,13 +556,35 @@ class Region(db.Model):
         return {
             'id': self.id,
             'code': self.code,
-            'name': self.name
+            'name': self.name,
+            'createdAt': self.createdAt,
+            'modifiedAt:': self.modifiedAt
         }        
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.committ()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getAllRegions():
+        return Region.query.all()
+
+    @staticmethod
+    def getOneById(id):
+        return Region.query.get(id)
 
 
 class UserStore(db.Model):
     __tablename__ = 'UserStore'
-    id = Column(Integer, primary_key=True)
+    id = db.Column(Integer, primary_key=True)
     name = Column(String(100), nullable = False)
     
     userId = Column(Integer, ForeignKey('User.id'))
@@ -1010,12 +1045,12 @@ class CartProduct(db.Model):
     modifiedAt  = Column(DateTime)
 
     # class constructor
-    def __init__(self, cartId, price, amount, productId):
+    def __init__(self, cart, price, amount, product):
         """
         Class constructor
         """
-        self.cartId = cartId
-        self.productId = productId
+        self.cartId = cart.id
+        self.productId = product.id
         self.price = price
         self.amount = amount
         self.createdAt = datetime.datetime.utcnow()
@@ -1117,3 +1152,163 @@ class OrderStatus(db.Model):
     def get_login_by_email(email):
         login = Login.query.filter_by(email=email).first()
         return login 
+
+
+class Order(db.Model):
+    __tablename__ = 'Order'
+    id = db.Column(Integer, primary_key=True)
+
+    userId = db.Column(Integer, ForeignKey('User.id'))
+    user = relationship(User, lazy=False)
+
+    orderStatusId = db.Column(Integer, ForeignKey('OrderStatus.id'))
+    orderStatus = relationship(OrderStatus, lazy=False)
+
+    regionId = db.Column(Integer, ForeignKey('Region.id'))
+    region = relationship(Region, lazy=False)
+
+    products = relationship("OrderProduct", backref="Order", lazy=True, cascade='all, delete-orphan')
+    totalPrice = db.Column(Float)
+    flete = db. Column(Float)
+    address = db.Column(String)
+
+    createdAt = db.Column(DateTime)
+    modifiedAt  = db.Column(DateTime)
+
+    # class constructor
+    def __init__(self, user, region, orderStatus, totalPrice, flete, address):
+        """
+        Class constructor
+        """
+        self.userId = user.id
+        self.orderStatusId = orderStatus.id
+        self.regionId = region.id
+        self.totalPrice = totalPrice
+        self.flete = flete
+        self.address = address
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
+    def __rep__(self):
+        return "Order %r>" % self.id
+
+    def serialize(self):
+        return {
+            'id': self.id,
+            'user': self.user.serialize(),
+            'orderStatus': self.orderStatus.serialize(),
+            'region': self.region.serialize(),
+            'totalPrice': self.totalPrice,
+            'flete': self.flete,
+            'address': self.address,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt
+        }   
+
+    def serialize_with_products(self):
+        print('****Order.serialize_with_product.products:', self.products)
+        products = list(map(lambda product: product.serialize(), self.products))
+
+        return {
+            'id': self.id,
+            'user': self.user.serialize(),
+            'orderStatus': self.orderStatus.serialize(),
+            'region': self.region.serialize(),
+            'totalPrice': self.totalPrice,
+            'flete': self.flete,
+            'address': self.address,
+            'products': products,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt
+        }   
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getOneById(id):
+        return Order.query.get(id)
+
+    @staticmethod
+    def getAl():
+        return Order.query.all()
+
+
+class OrderProduct(db.Model):
+    __tablename__ = 'OrderProduct'
+    id = Column(Integer, primary_key=True)
+    orderId = Column(Integer, ForeignKey('Order.id'))
+    order = relationship(Order)
+
+    productId = Column(Integer, ForeignKey('Product.id'))
+    product = relationship(Product)
+
+    price = Column(Float)
+    amount = Column(Integer)
+
+    createdAt = Column(DateTime)
+    modifiedAt  = Column(DateTime)
+
+    # class constructor
+    def __init__(self, order, product, price, amount):
+        """
+        Class constructor
+        """
+        print( ">>>### OrderProdut: order.Id:", order.id ,", product.Id:", product.id,", price:", price, ", amount:", amount)
+
+        #print( "OrderProdut id:", id , ", price:",price,", amount:", amount,", order:", self.order.serialize(), ", Product:", self.product.serialize(), ", createdAt:", self.createdAt, ", modifiedAt:"+ self.modifiedAt)
+        
+        self.orderId = order.id
+        self.productId = product.id
+        self.price = price
+        self.amount = amount
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
+    def __rep__(self):
+        response= "id: " + self.id + ", price:" + self.price + ", amount:"+ self.amount + ", Order:"+ self.order.serialize() + ", Product:"+ self.product.serialize() + ", createdAt:"+ self.createdAt + "modifiedAt:"+ self.modifiedAt
+
+        return "OrderProduct %r>" % response
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "price": self.price,
+            "amount": self.amount,
+            "Order": self.order.serialize(),
+            "Product": self.product.serialize(),
+            "createdAt": self.createdAt,
+            "modifiedAt": self.modifiedAt
+        }   
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getAll():
+        return OrderProduct.query.all()
+
+    @staticmethod
+    def getOneById(id):
+        return OrderProduct.query.get(id)
+
+
+
