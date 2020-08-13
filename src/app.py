@@ -1130,6 +1130,15 @@ def getOrderProduct(id):
     return jsonify(orderProduct.serialize()), 200
 
 
+@app.route('/user-store/<int:userStoreId>/sells', methods=['GET'])
+def getProductsSold(userStoreId):
+    print("***** getOrderProduct **")
+    productsSold = OrderProduct.getAllByUserStoreId(userStoreId)
+    print('>>>getProductsSold.productsSold=', productsSold)
+    
+    #productsSoldList = list(map( lambda product: product.serialize(), productsSold ))
+    return jsonify(productsSold), 200
+
 @app.route("/order-product/<int:id>", methods=['PUT'])  
 @app.route("/order-product/", methods=['POST'])  
 def addOrderProduct(id=None):
