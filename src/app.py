@@ -1347,6 +1347,13 @@ def sitemap():
     orderProduct1 = OrderProduct(order=order1, product=product1, price=2000, amount=3)
     orderProduct1.save()
 
+    userMessage1 =  UserMessage(senderId=1, receiverId=2, messageTypeId=1, messageStatusId=1, message="Message 1", link='Link1')
+
+    userMessage2 =  UserMessage(senderId=1, receiverId=2, messageTypeId=1, messageStatusId=1, message="Message 2", link='Link2')
+
+    userMessage3 =  UserMessage(senderId=2, receiverId=3, messageTypeId=1, messageStatusId=1, message="Message 3", link='Link2')
+
+
     return 'Tables filled'
 
 #if __name__ == '__main__':

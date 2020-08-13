@@ -1182,6 +1182,11 @@ class Order(db.Model):
         return "Order %r>" % self.id
 
     def serialize(self):
+        createdAt = self.createdAt
+        if createdAt == None:
+            createdAt=''
+        else:
+            createdAt = createdAt.strftime('%d/%m/%Y %H:%M:%S')
         return {
             'id': self.id,
             'user': self.user.serialize(),
@@ -1190,7 +1195,7 @@ class Order(db.Model):
             'totalPrice': self.totalPrice,
             'flete': self.flete,
             'address': self.address,
-            'createdAt': self.createdAt,
+            'createdAt': createdAt,
             'modifiedAt': self.modifiedAt
         }   
 
@@ -1236,7 +1241,7 @@ class Order(db.Model):
 
     @staticmethod
     def getAllByUserId(userId):
-        orders = Order.query.filter_by(userId=userId).all()
+        orders = Order.query.filter_by(userId=userId).order_by(Order.createdAt.desc()).all()
         return orders 
 
 
