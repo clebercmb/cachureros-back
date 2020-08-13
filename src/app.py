@@ -1108,7 +1108,7 @@ def addOrder():
 
     order = Order(user=user, region=region, orderStatus=orderStatus, totalPrice=2000, flete=flete, address=address)
 
-    productsToBeSaved = []
+
     for orderProduct in products:
         print('>>>orderProduct=', orderProduct)
         product = Product.getOneById(orderProduct['productId'])
@@ -1116,9 +1116,10 @@ def addOrder():
             return jsonify({"msg":"Product {0} not found!".format(orderProduct['productId'])}), 404
 
         newProduct = OrderProduct(order=order, product=product, price=orderProduct['price'], amount=orderProduct['amount'])
-        productsToBeSaved.append(newProduct)
+        order.products.append(newProduct)
 
-    order.save(productsToBeSaved)
+
+    order.save()
     return jsonify(order.serialize()),201
 
 # OrderProduct

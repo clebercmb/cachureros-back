@@ -1215,11 +1215,6 @@ class Order(db.Model):
         db.session.add(self)
         db.session.commit()
 
-    def save(self, products):
-        for product in products:
-            self.products.append(product)    
-        db.session.add(self)
-        db.session.commit()
 
 
     def update(self):
