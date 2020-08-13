@@ -1312,5 +1312,24 @@ class OrderProduct(db.Model):
     def getOneById(id):
         return OrderProduct.query.get(id)
 
+    @staticmethod
+    def getAllByUserStoreId(userStoreId):  
+        query = db.session.query(Product.id, Product.name, db.func.sum(OrderProduct.amount).label("totalAmount"), db.func.sum(OrderProduct.amount * OrderProduct.price).label("totalPrice")).outerjoin(OrderProduct)
+        query = query.filter(Product.id == OrderProduct.productId)
+        
+        records = query.group_by(Product.id).all()
 
+        recordsList=[]
+        for record in records:
+            recordObject = {
+                "id": record.id,
+                "name": record.name,
+                "totalAmount": record.totalAmount,
+                "totalPrice": record.totalPrice
+            }
+            recordsList.append(recordObject)
+            print('>>record:',record)
+        
+        print('>>>getAllByUserStoreId.len(records)=', len(records))
 
+        return recordsList
