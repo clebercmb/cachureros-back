@@ -41,7 +41,7 @@ class Login(db.Model):
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt 
         } 
-   a
+    def serialize_with_user(self):
         print('****Login.serialize_with_user:', self.user)
         return {
             'id': self.id,
@@ -1309,6 +1309,3 @@ class OrderProduct(db.Model):
     @staticmethod
     def getOneById(id):
         return OrderProduct.query.get(id)
-
-
-
