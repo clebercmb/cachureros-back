@@ -40,7 +40,7 @@ class Login(db.Model):
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt 
         } 
-    def serialize_with_user(self):
+   a
         print('****Login.serialize_with_user:', self.user)
         return {
             'id': self.id,
