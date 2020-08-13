@@ -700,8 +700,6 @@ class UserStore(db.Model):
         return userStore    
     
 
-
-
 class Department(db.Model):
     __tablename__ = 'Department'
     id = db.Column(Integer, primary_key=True)
@@ -1142,16 +1140,7 @@ class OrderStatus(db.Model):
 
     @staticmethod
     def getOneById(id):
-        return Login.query.get(id)
-
-    @staticmethod
-    def get_all_login():
-        return Login.query.all()
-
-    @staticmethod
-    def get_login_by_email(email):
-        login = Login.query.filter_by(email=email).first()
-        return login 
+        return OrderStatus.query.get(id)
 
 
 class Order(db.Model):
@@ -1226,6 +1215,13 @@ class Order(db.Model):
         db.session.add(self)
         db.session.commit()
 
+    def save(self, products):
+        for product in products:
+            self.products.append(product)    
+        db.session.add(self)
+        db.session.commit()
+
+
     def update(self):
         self.modifiedAt = datetime.datetime.utcnow()
         db.session.commit()
@@ -1241,6 +1237,12 @@ class Order(db.Model):
     @staticmethod
     def getAl():
         return Order.query.all()
+
+
+    @staticmethod
+    def getAllByUserId(userId):
+        orders = Order.query.filter_by(userId=userId).all()
+        return orders 
 
 
 class OrderProduct(db.Model):
