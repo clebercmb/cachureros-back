@@ -1303,9 +1303,9 @@ def sitemap():
     product4.save()
 
 
-    cartProduct1 = CartProduct(cartId=1, price=10000, amount=1, productId=1)
-    cartProduct2 = CartProduct(cartId=1, price=10000, amount=1, productId=2)
-    cartProduct3 = CartProduct(cartId=2, price=10000, amount=1, productId=1)
+    cartProduct1 = CartProduct(cart1, price=10000, amount=1, product=product1)
+    cartProduct2 = CartProduct(cart1, price=10000, amount=1, product=product2)
+    cartProduct3 = CartProduct(cart2, price=10000, amount=1, product=product1)
 
     cartProduct1.save()
     cartProduct2.save()
@@ -1324,7 +1324,7 @@ def sitemap():
     order1 = Order(user=user1, orderStatus=orderStatus1, region=region1, totalPrice=2000, flete=1000, address='Addresses 1')
     order1.save()
  
-    orderProduct1 = OrderProduct(orderId=order1, productId=product1, price=2000, amount=3)
+    orderProduct1 = OrderProduct(order=order1, product=product1, price=2000, amount=3)
     orderProduct1.save()
 
     return 'Tables filled'
