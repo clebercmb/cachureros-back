@@ -1,8 +1,8 @@
-import os,datetime 
+import os, datetime 
 from flask import Flask, request, jsonify, url_for, send_from_directory
 from flask_script import Manager 
 from flask_migrate import Migrate, MigrateCommand
-from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, Cart, CartProduct, WeightUnit, Region, Follow
+from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, Cart, CartProduct, WeightUnit, Region, Follow, MessageType, MessageStatus, UserMessage, Order, OrderProduct, OrderStatus
 from flask_cors import CORS
 from utils import APIException, generate_sitemap, allowed_file
 from graphene import ObjectType, String, Schema
@@ -28,9 +28,6 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config['JWT_SECRET_KEY'] = 'secret-key'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-
-
-
 db.init_app(app)
 
 CORS(app)
@@ -40,9 +37,7 @@ Migrate(app,db)
 manager = Manager(app)
 manager.add_command("db", MigrateCommand)
 
-products = [
-
-]
+products = []
 
 # Login
 @app.route('/login-all', methods=['GET'])
@@ -80,6 +75,110 @@ def login():
 
     return jsonify({"success": "Log In succesfully!", "data": data}), 200
 
+# User Messages
+@app.route("/user-message", methods=['POST'])  
+def saveUserMessage():
+    print('***saveUserMessage***')
+    print(request.json)    
+
+    senderId = request.json.get('senderId',None)
+    receiverId = request.json.get('receiverId',None)
+    messageTypeId = request.json.get('messageTypeId',None)
+    messageStatusId = request.json.get('messageStatusId',None)
+    message = request.json.get('message',None)
+    link = request.json.get('link',None)
+
+
+    print('>>>>saveUserMessage>> senderId=', senderId, 'receiverId=', receiverId, 'messageTypeId=', messageTypeId, 'messageStatusId=', messageStatusId, 'message=', message, 'link=', link)
+
+    if not senderId:
+        return jsonify({"msg":"senderId is required"}), 422
+
+    if not receiverId:
+        return jsonify({"msg":"receiverId is required"}), 422
+
+    if not messageTypeId:
+        return jsonify({"msg":"messageTypeId is required"}), 422
+    
+    if not messageStatusId:
+        return jsonify({"msg":"messageStatusId is required"}), 422
+    
+    if not message:
+        return jsonify({"msg":"message is required"}), 422
+
+    userMessage = UserMessage(senderId=senderId, receiverId=receiverId, messageTypeId=messageTypeId, messageStatusId=messageStatusId, message=message, link=link)
+
+    userMessage.save()
+    print('>>>>>userMessage.__dict__.keys()=', userMessage.__dict__.keys())
+
+    return jsonify(userMessage.serialize()),201
+
+@app.route("/user-message/<int:id>", methods=['DELETE'])  
+def deleteUserMessage(id):
+    print('***deleteUserMessage: id:', id)
+    #print(request.json)    
+
+    userMessage = UserMessage.getOneBy(id)
+
+    if not userMessage:
+        return jsonify({"msg":"Message {0} not found!".format(id)}), 404
+
+    print('***>>deleteUserMessage=', userMessage.serialize())
+
+    userMessage.delete()
+    print('***>>deleteUserMessage (after delete)=', userMessage)
+
+    user = userMessage.receiver
+    print('###deleteUserMessage.user.senders=', user.senders)
+
+    userMessagesList = list(map( lambda userMessage: userMessage.serialize(),  user.senders ))
+
+    return jsonify(userMessagesList),200
+
+@app.route("/user-message/<int:id>", methods=['GET'])  
+def getUserMessage(id):
+    print('***getUserMessage: id:', id)
+    print(request.json)    
+
+    userMessage = UserMessage.getOneBy(id)
+
+    if not userMessage:
+        return jsonify({"msg":"Message {0} not found!".format(id)}), 404
+
+    print('***>>getUserMessage.userMessage=', userMessage.serialize())
+
+    return jsonify(userMessage.serialize()),200
+
+
+@app.route("/user-message/", methods=['GET'])  
+def getAllUsersMessages():
+    print('***getAllUsersMessages')
+    print(request.json)    
+
+    userMessages = UserMessage.getAll()
+
+    print('***>>getAllUsersMessages.userMessages=', userMessages)
+
+    userMessagesList = list(map( lambda userMessage: userMessage.serialize(), userMessages ))
+
+    return jsonify(userMessagesList),200
+
+
+@app.route("/user-message/user/<int:id>", methods=['GET'])  
+def getUserMessageByReceivedId(id):
+    print('***getUserMessageByReceivedId: id:', id)
+    print(request.json)    
+
+    userMessages = UserMessage.getAllByReceivedId(id)
+
+    print('getUserMessageByUseriD.userMessages=', userMessages)
+
+    userMessagesList = list(map( lambda userMessage: userMessage.serialize(), userMessages ))
+
+    return jsonify(userMessagesList),200
+
+
+# Register New User
 @app.route('/register', methods=['POST'])
 def register():
     print("** register **")
@@ -94,10 +193,13 @@ def register():
     login = Login(email=email, password=password)
     login.save()
 
-    user = User(name=name, loginId=login.id, photoUrl=None, active=True)
+    user = User(name=name, loginId=login.id, photoUrl=None, active=True, birthDate=None, nationalId=None, phone=None)
     user.save()
 
-    userStore = UserStore(name=name, userId=user.id, regionId=None, title='', bio='', url='', photoUrl=None)
+    cart = Cart(userId=user.id)
+    cart.save()
+
+    userStore = UserStore(name=name, userId=user.id, regionId=None, bio='', url='', photoUrl=None)
     userStore.save()
     print('login=', login)
 
@@ -113,8 +215,6 @@ def register():
     return jsonify({"success": "Log In succesfully!", "data": data}), 200
 
 
-
-
 # User
 @app.route('/user', methods=['GET'])
 def getAllUsers():
@@ -127,7 +227,7 @@ def getAllUsers():
 @app.route('/user/<int:id>', methods=['GET'])
 def getUser(id):
     print("** getUser **")
-    user = User.getOneBy(id)
+    user = User.getOneById(id)
     print('>>>user=', user)
 
     print('>>>user.followeds=', user.getFolloweds())
@@ -137,7 +237,6 @@ def getUser(id):
         return jsonify(user.serialize()), 200
     else:
         return jsonify({"msg":"User not found"}), 404
-
 
 
 @app.route('/user-follow', methods=['GET'])
@@ -206,19 +305,6 @@ def getUserStoreByUrl(url):
     else:
         return jsonify({"msg":"UserStore not found"}), 404
 
-@app.route('/my-store/<int:id>', methods=['GET'])
-def getUserStoreById(id):
-    print("** appy.getUserStoreByUrl(id).request.method===>" ,  request.method)
-    print("** appy.getUserStoreByUrl.id=",id) 
-    userStore = UserStore.getOneUserStoreById(id)
-    print("** appy.getUserStoreByUrl.userStore=",userStore) 
-
-    if userStore:
-        return jsonify(userStore.serialize_with_product()), 200
-    else:
-        return jsonify({"msg":"UserStore not found"}), 404
-
-
 @app.route("/user-store", methods=['POST'])  
 def addUserStoreId():
     print('***addUserStoreId***')
@@ -228,7 +314,9 @@ def addUserStoreId():
     name = request.json.get('name',None)
     userId = request.json.get('userId',None)
     regionId = request.json.get('regionId', None)
- 
+    bio = request.json.get('regionId', None)
+    url = request.json.get('url', None)
+    photoUrl = request.json.get('photoUrl', None)
 
     print('name=', name, 'userId=', userId)
 
@@ -241,7 +329,7 @@ def addUserStoreId():
     if not regionId:
         return jsonify({"msg":"regionId is required"}), 422
 
-    userStore = UserStore(name, userId, regionId)
+    userStore = UserStore(name=name, userId=userId, regionId=regionId, bio=bio, url=url, photoUrl=photoUrl)
     #userStore.name = name
     #userStore.userId = userId
     #userStore.regionId = regionId
@@ -250,19 +338,167 @@ def addUserStoreId():
 
     return jsonify(userStore.serialize()),201
 
+@app.route('/my-store/<int:id>', methods=['GET'])
+def getUserStoreById(id):
+    print("** appy.getUserStoreById(id).request.method===>" ,  request.method)
+    print("** appy.getUserStoreById.id=",id) 
+    userStore = UserStore.getOneUserStoreById(id)
+    print("** appy.getUserStoreById.userStore=",userStore) 
+
+    if userStore:
+        return jsonify(userStore.serialize_with_product()), 200
+    else:
+        return jsonify({"msg":"UserStore not found"}), 404
+
+
+@app.route('/my-store/<int:id>', methods=['PUT'])
+def saveUserStoreById(id):
+    print("** appy.saveUserStoreById(id).request.method===>" ,  request.method)
+    print("** appy.saveUserStoreById(id).request===>" ,  request)
+    print("** appy.saveUserStoreById(id).request.files===>" ,  request.files)
+
+    print("** appy.saveUserStoreById.id=",id) 
+    userStore = UserStore.getOneUserStoreById(id)
+    print("** appy.saveUserStoreById.userStore=",userStore) 
+
+    email = request.form.get("email", None)
+    password = request.form.get("password", None)
+    userName = request.form.get("userName", None)
+    birthDate = request.form.get("birthDate", None)
+    nationalId= request.form.get("nationalId", None)
+    phone = request.form.get("phone", None)
+    userStoreName = request.form.get("userStoreName", None)
+    regionId = request.form.get("regionId", None)
+    bio = request.form.get("bio", None)
+    url = request.form.get("url", None)
+    userStorePhotoUrl = request.form.get("userStorePhotoUrl", None)
+    hasUserStorePhotoUrl = request.form.get("hasUserStorePhotoUrl") != 'false'
+    userPhotoUrl = request.form.get("userPhoto", None)
+    hasUserPhotoUrl = request.form.get("hasUserPhotoUrl") != 'false'
+
+    print('>>>birthDate=', birthDate, type(birthDate))
+    birthDateFormated= ''
+    try:
+        birthDateFormated = datetime.datetime.strptime(str(birthDate), '%d/%m/%Y').date()
+    except ValueError as ve:
+        print('########saveUserStoreById.invalid date:, ', ve)
+        return jsonify({"msg":"invalid birthdate"}), 422
+
+    birthDate = birthDateFormated
+
+    print('<<<saveUserStoreById>>> email=', email, ', password=', password, ', userName=', userName, ', birthDate=', birthDate, ', nationalId=', nationalId, ', phone=', phone, ', userStoreName=', userStoreName, ', regionId=', regionId, ', bio=', bio, ', url=', url,  ', userStorePhotoUrl=', userStorePhotoUrl, userStorePhotoUrl == None, ', hasUserStorePhotoUrl=', hasUserStorePhotoUrl, ', userPhotoUrl=', userPhotoUrl, ', hasUserPhotoUrl=', hasUserPhotoUrl)
+
+    if not userStore:
+        return jsonify({"msg":"UserStore not found"}), 404
+
+    if not request.form.get("email", None):
+        return jsonify({"msg":"email is required"}), 422
+
+    if not request.form.get("password", None):
+        return jsonify({"msg":"password is required"}), 422
+
+    if not request.form.get("userName", None):
+        return jsonify({"msg":"userName is required"}), 422
+
+    if not request.form.get("birthDate", None):
+        return jsonify({"msg":"birthDate is required"}), 422
+
+    if not request.form.get("nationalId", None):
+        return jsonify({"msg":"nationalId is required"}), 422
+
+    if not request.form.get("phone", None):
+        return jsonify({"msg":"phone is required"}), 422
+
+    if not request.form.get("userStoreName", None):
+        return jsonify({"msg":"userStoreName is required"}), 422
+
+    if not request.form.get("regionId", None):
+        return jsonify({"msg":"regionId is required"}), 422
+
+    if not request.form.get("url", None):
+        return jsonify({"msg":"url is required"}), 422
+
+    if hasUserStorePhotoUrl and len(userStorePhotoUrl) == 0:
+        return jsonify({"msg":"userStorePhotoUrl is required"}), 422
+
+
+    if hasUserPhotoUrl: 
+        print('&&&&&isFileAllowed')
+
+        if 'userPhoto' not in request.files:
+            return jsonify({"msg": "userPhoto is required"}), 400
+
+
+        if not isFileAllowed('userPhotoUrl', userPhotoUrl):
+            msg = "User photo image {0} not allowed!".format('userPhotoUrl')
+            return jsonify({msg}), 400
+        saveImageFile(fileKey='userPhotoUrl', request=request, fileType="UserProfile", email=email)
+
+
+    if hasUserStorePhotoUrl:
+        if not isFileAllowed(fileKey='userStorePhotoUrl', request=request):
+            msg = "UserStore photo image {0} not allowed!".format('userStorePhotoUrl')
+            return jsonify({msg}), 400
+        saveImageFile(fileKey='userStorePhotoUrl', request=request, fileType="UserStore", email=email)
+
+    login = Login.getOneById(userStore.user.login.id)
+    login.email = email
+    login.password = password
+    login.update()
+
+    user = User.getOneById(userStore.user.id)
+    user.name = userName
+    user.birthDate = birthDate
+    user.nationalId = nationalId
+    user.phone = phone
+
+    userStore.name = userStoreName
+    userStore.regionId = regionId
+    userStore.bio = bio
+    userStore.url = url
+
+    userStore.save()
+
+    print('saveUserStoreById.userStore (after save):', userStore.serialize())
+    return jsonify(userStore.serialize()),200
+
+
+def isFileAllowed(fileKey, request):
+    print('>>>>>>>isFileAllowed.fileKey=', fileKey)
+    print('****isFileAllowed.request.files=', request.files[''])
+    file = request.files[fileKey]
+    print('>>>>>>>isFileAllowed.file.filename=', file.filename)
+    if not (file and allowed_file(file.filename, ALLOWED_EXTENSIONS_IMGS)):
+        return False
+    return True
+
+
+def saveImageFile(fileKey, request, fileType, email):
+    
+    file = request.files[fileKey]
+
+    login = Login.query.filter_by(email=email).first()
+    filename = secure_filename(file.filename)
+    filename = fileKey+"_" + str(login.id) + "_" + filename
+    print('saveImageFile.filename=',filename)
+    print('saveImageFile.filename.os=',os.path.join(app.config['UPLOAD_FOLDER']+"/images"))
+    
+    file.save(os.path.join(IMAGES_FOLDER, filename))
+    return filename
+
+
 
 #Follower
 @app.route('/followed/<int:id>', methods=['GET'])
 def getFollowedByUserId(id):
     print("** getFollowedByUserId(id).request.method===>" ,  request.method)
-    followed = Follower.getAllFollower()
+    followed = Follow.getAllFollower()
     print("** getFollowedByUserId(id).followed=",followed) 
 
     #if userStore:
     #    return jsonify(userStore.serialize_with_product()), 200
     #else:
     #    return jsonify({"msg":"UserStore not found"}), 404
-
 
 @app.route("/follower", methods=['POST'])  
 def addFollower():
@@ -281,11 +517,11 @@ def addFollower():
     if not followedId:
         return jsonify({"msg":"followedId is required"}), 422
 
-    follower = Follower(followerId, followedId)
+    follow = Follow(followerId, followedId)
     
-    follower.save()
+    follow.save()
 
-    return jsonify(follower.serialize()),201
+    return jsonify(follow.serialize()),201
 
 
 # Department
@@ -593,15 +829,18 @@ def saveProduct(id=None):
 
     print('>>>saveProduct.hasUpLoadPhotos (after)=', hasUpLoadPhotos)
 
-
     hasBrand = False
     if hasBrand == 'true':
         hasBrand = True
-
+    print('>>>saveProduct.hasUpLoadPhotos.len(request.files)=', len(request.files))
     for i in range(len(request.files)):
+        print('#####saveProduct.hasUpLoadPhotos[i]=', i, hasUpLoadPhotos[i])
+
+        if not hasUpLoadPhotos[i]:
+            continue
         photo = 'photo'+str(i)
         if photo not in request.files:
-            msg = "{0} is required".format(photo)
+            msg = "{0} is required!".format(photo)
             return jsonify({"msg": msg}), 400 
         file = request.files[photo]
         if len(file.filename) == 0:
@@ -626,7 +865,6 @@ def saveProduct(id=None):
         print('saveProduct.filename=',filename)
         print('saveProduct.filename.os=',os.path.join(app.config['UPLOAD_FOLDER']+"/images"))
         
-        #file.save(os.path.join(app.config['UPLOAD_FOLDER']+"\\images\\", filename))
         file.save(os.path.join(IMAGES_FOLDER, filename))
         print('>>>>i=', i)
         hasUpLoadPhotos[i]=filename
@@ -675,37 +913,44 @@ def saveProduct(id=None):
 
 
 
-@app.route('/images-products/<filename>')
+@app.route('/images/<filename>')
 def image_profile(filename):
     return send_from_directory(IMAGES_FOLDER,filename)
 
 
 # Cart
-@app.route('/cart/<int:user_id>', methods=['GET'])
-def getCart(user_id):
+@app.route('/cart/<int:userId>', methods=['GET'])
+def getCart(userId):
     print("** getCart **")
-    carts = Cart.query.all()
-    cartsList = list(map( lambda cart: cart.serialize(), carts ))
-    return jsonify(cartsList), 200
+    cart = Cart.getOneById(userId)
+
+    if not cart:
+        return jsonify({"msg":"Cart not found"}), 404
+
+    return jsonify(cart.serialize()), 200
+
+@app.route('/cart-with-products/<int:userId>', methods=['GET'])
+def getCartWithProducts(userId):
+    print("** getCartWithProducts **")
+    cart = Cart.getOneById(userId)
+
+    if not cart:
+        return jsonify({"msg":"Cart not found"}), 404
+
+    return jsonify(cart.serialize_with_products()), 200
 
 
-@app.route("/cart/<int:user_id>", methods=['POST'])  
-def addCart(user_id):
+@app.route("/cart/<int:userId>", methods=['POST'])  
+def addCart(userId):
     print('***addCart***')
     print(request.json)    
 
-    userId = user_id
-
-
     print('userId=', userId)
-
 
     if not userId:
         return jsonify({"msg":"userId is required"}), 422
 
-
-
-    cart = Cart()
+    cart = Cart(user.id)
     cart.userId = userId
     
     db.session.add(cart)
@@ -713,26 +958,34 @@ def addCart(user_id):
     return jsonify(cart.serialize()),201
 
 # CartProduct
-@app.route('/cartproduct/<int:user_id>', methods=['GET'])
-def getCartProduct(user_id):
+@app.route('/cart-product/<int:id>', methods=['GET'])
+def getCartProduct(id):
     print("** getCartProduct **")
+    cartProduct = CartProduct.getOneById(id)
+    return jsonify(cartProduct.serialize()), 200
+
+@app.route('/cart-product/<int:user_id>', methods=['GET'])
+def getCartProductByUserId(user_id):
+    print("** getCartProductByUserId **")
     cartsproduct = CartProduct.query.all()
     cartsList = list(map( lambda cartProduct: cartProduct.serialize(), cartsproduct ))
     return jsonify(cartsList), 200
 
-
-@app.route("/cartproduct/<int:user_id>", methods=['POST'])  
-def addCartProduct(user_id):
+@app.route("/cart-product/<int:id>", methods=['PUT'])  
+@app.route("/cart-product/", methods=['POST'])  
+def addCartProduct(id=None):
     print('***addCartProduct***')
     print(request.json)    
 
+    cartId = request.json.get('cartId',None)
     price = request.json.get('price',None)
     amount = request.json.get('amount',None)
     productId = request.json.get('productId',None)
-    cartId = request.json.get('cartId',None)
 
+    print('***addCartProduct => cartId=', cartId, 'price=', price, 'amount=', amount, 'productId=', productId)
 
-    print('price=', price, 'amount=', amount, 'productId=', productId, 'cartId=', cartId)
+    if not cartId:
+        return jsonify({"msg":"cartId is required"}), 422
 
     if not price:
         return jsonify({"msg":"price is required"}), 422
@@ -743,39 +996,205 @@ def addCartProduct(user_id):
     if not productId:
         return jsonify({"msg":"productId is required"}), 422
 
-    if not cartId:
-        return jsonify({"msg":"cartId is required"}), 422
+    cart = Cart.getOneById(cartId)
+    product = Product.getOneById(productId)
 
-    cartproduct = CartProduct()
-    cartproduct.price = price
-    cartproduct.amount = amount
-    cartproduct.productId = productId
-    cartproduct.cartId = cartId
-    
-    db.session.add(cartproduct)
-    db.session.commit()
+    if not cart:
+        return jsonify({"msg":"Cart not found"}), 404
+
+    if not product:
+        return jsonify({"msg":"Product not found"}), 404
+
+    cartproduct=None
+    if id:
+        cartproduct = CartProduct.getOneById(id)
+        if not cartproduct:
+            return jsonify({"msg":"CartProduct not found"}), 404
+        cartproduct.price = price
+        cartproduct.amount = amount
+        cartproduct.update()
+    else:        
+        cartproduct = CartProduct(cart=cart, price=price, amount=amount, product=product)
+        cartproduct.save()
+
     return jsonify(cartproduct.serialize()),201
+
+# Order
+@app.route('/order/<int:id>', methods=['GET'])
+def getOrder(id):
+    print("** getOrder **")
+    order = Order.getOneById(id)
+
+    if not order:
+        return jsonify({"msg":"Order not found"}), 404
+
+    return jsonify(order.serialize()), 200
+
+@app.route('/order/<int:id>', methods=['DELETE'])
+def deleteOrder(id):
+    print("** getOrder **")
+    order = Order.getOneById(id)
+
+    if not order:
+        return jsonify({"msg":"Order not found"}), 404
+
+    #print('>>deleteOrder.order=', order.serialize())
+    order.delete()
+
+    return jsonify(order.serialize()),200
+
+
+@app.route('/order-with-products/<int:id>', methods=['GET'])
+def getOrdertWithProducts(id):
+    print("** getOrdertWithProducts **")
+    order = Order.getOneById(id)
+
+    if not order:
+        return jsonify({"msg":"Order not found"}), 404
+
+    return jsonify(order.serialize_with_products()), 200
+
+@app.route("/order/", methods=['POST'])  
+def addOrder():
+    print('***addOrder***')
+    print(request.json)    
+
+    userId = request.json.get('userId',None)
+    regionId = request.json.get('regionId', None)
+    products = request.json.get('products', None)
+    flete = request.json.get('flete', None)
+    address = request.json.get('address', None)
+
+    if not userId:
+        return jsonify({"msg":"userId is required"}), 422
+
+    if not regionId:
+        return jsonify({"msg":"regionId is required"}), 422
+
+    if not products:
+        return jsonify({"msg":"products is required"}), 422
+
+    if not flete:
+        return jsonify({"msg":"flete is required"}), 422
+
+    if not address:
+        return jsonify({"msg":"address is required"}), 422
+
+    user = User.getOneById(userId)
+    region = Region.getOneById(regionId)
+    orderStatus = OrderStatus.getOneById(1)
+
+    print('>>addOrder.user=', user)
+    print('>>addOrder.region=', region)
+    print('>>addOrder.orderStatus=', orderStatus)
+
+    if not user:
+        return jsonify({"msg":"User not found"}), 404
+
+    if not region:
+        return jsonify({"msg":"Region not found"}), 404
+
+    if not orderStatus:
+        return jsonify({"msg":"OrderStatus not found"}), 404
+
+    order = Order(user=user, region=region, orderStatus=orderStatus, totalPrice=2000, flete=flete, address=address)
+    
+    order.save()
+    return jsonify(order.serialize()),201
+
+# OrderProduct
+@app.route('/order-product/<int:id>', methods=['GET'])
+def getOrderProduct(id):
+    print("** getOrderProduct **")
+    orderProduct = OrderProduct.getOneById(id)
+    return jsonify(orderProduct.serialize()), 200
+
+
+@app.route("/order-product/<int:id>", methods=['PUT'])  
+@app.route("/order-product/", methods=['POST'])  
+def addOrderProduct(id=None):
+    print('***addOrderProduct***')
+    print(request.json)    
+
+    orderId = request.json.get('orderId',None)
+    price = request.json.get('price',None)
+    amount = request.json.get('amount',None)
+    productId = request.json.get('productId',None)
+
+    print('***addOrderProduct => orderId=', orderId, 'price=', price, 'amount=', amount, 'productId=', productId)
+
+    if not orderId:
+        return jsonify({"msg":"orderId is required"}), 422
+
+    if not price:
+        return jsonify({"msg":"price is required"}), 422
+
+    if not amount:
+        return jsonify({"msg":"amount is required"}), 422
+
+    if not productId:
+        return jsonify({"msg":"productId is required"}), 422
+
+    order = Order.getOneById(orderId)
+    product = Product.getOneById(productId)
+
+    if not order:
+        return jsonify({"msg":"Order not found"}), 404
+
+    if not product:
+        return jsonify({"msg":"Product not found"}), 404
+
+    orderproduct=None
+    if id:
+        orderproduct = OrderProduct.getOneById(id)
+        if not orderproduct:
+            return jsonify({"msg":"OrderProduct not found"}), 404
+        orderproduct.price = price
+        orderproduct.amount = amount
+        orderproduct.update()
+    else:        
+        orderproduct = OrderProduct(order=order, price=price, amount=amount, product=product)
+        orderproduct.save()
+
+    return jsonify(orderproduct.serialize()),201
 
 
 # generate sitemap with all your endpoints
 @app.route('/')
 def sitemap():
-    db.session.add(Region(code='01', name='Tarapac\u00e1'))
-    db.session.add(Region(code='02', name='Antofagasta'))
-    db.session.add(Region(code='03', name='Atacama'))
-    db.session.add(Region(code='04', name='Coquimbo'))
-    db.session.add(Region(code='05', name='Valparaíso'))
-    db.session.add(Region(code='06', name='O\u2019Higgins'))
-    db.session.add(Region(code='07', name='Maule'))
-    db.session.add(Region(code='08', name='Biob\u00edo'))
-    db.session.add(Region(code='09', name='Araucan\u00eda'))
-    db.session.add(Region(code='10', name='Los Lagos'))
-    db.session.add(Region(code='11', name='Ays\u00e9n'))
-    db.session.add(Region(code='12', name='Magallanes'))
-    db.session.add(Region(code='13', name='Metropolitana de Santiago'))
-    db.session.add(Region(code='14', name='Los R\u00edos'))
-    db.session.add(Region(code='15', name='Arica y Parinacota'))
-    db.session.add(Region(code='16', name='\u00d1uble'))
+    region1 = Region(code='01', name='Tarapac\u00e1')
+    region2 = Region(code='02', name='Antofagasta')
+    region3 = Region(code='03', name='Atacama')
+    region4 = Region(code='04', name='Coquimbo')
+    region5 = Region(code='05', name='Valparaíso')
+    region6 = Region(code='06', name='O\u2019Higgins')
+    region7 = Region(code='07', name='Maule')
+    region8 = Region(code='08', name='Biob\u00edo')
+    region9 = Region(code='09', name='Araucan\u00eda')
+    region10 = Region(code='10', name='Los Lagos')
+    region11 = Region(code='11', name='Ays\u00e9n')
+    region12 = Region(code='12', name='Magallanes')
+    region13 = Region(code='13', name='Metropolitana de Santiago')
+    region14 = Region(code='14', name='Los R\u00edos')
+    region15 = Region(code='15', name='Arica y Parinacota')
+    region16 = Region(code='16', name='\u00d1uble')
+
+    region1.save()
+    region2.save()
+    region3.save()
+    region4.save()
+    region5.save()
+    region6.save()
+    region7.save()
+    region8.save()
+    region9.save()
+    region10.save()
+    region11.save()
+    region12.save()
+    region13.save()
+    region14.save()
+    region15.save()
+    region16.save()
 
     #Department
     department1 = Department(name='Hogar')
@@ -792,40 +1211,60 @@ def sitemap():
     department5.save()
     department6.save()
 
+    #MessageType
+    messageType1 = MessageType(name='duda')
+    messageType2 = MessageType(name='oferta')
+    messageType1.save()
+    messageType2.save()
+
+    #MessageStatus
+    messageStatus1 = MessageStatus(name='nueva')
+    messageStatus2 = MessageStatus(name='leido')
+    messageStatus1.save()
+    messageStatus2.save()
+
     #Login 1
     login1 = Login(email='juanita@gmail.com', password='1234')
-    user1 = User(name='User 1', loginId=1, photoUrl='/images/juanita.jpg', active=True)
-    userStore1 = UserStore(name='UserStore 1', regionId=13, userId=1, title='Title', bio='Bio', url='juanita', photoUrl='/images/tendita.png')
+    user1 = User(name='User 1', loginId=1, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 982838393')
+    cart1 = Cart(1)
+    userStore1 = UserStore(name='UserStore 1', regionId=13, userId=1, bio='Bio', url='juanita', photoUrl='tendita.png')
 
     login1.save()
     user1.save()
+    cart1.save()
     userStore1.save()
 
     #Login 2
     login2 = Login(email='juan@gmail.com', password='1234')
-    user2 = User(name='User 2', loginId=2, photoUrl='/images/juanita.jpg', active=True)
-    userStore2 = UserStore(name='UserStore 2', regionId=13, userId=2, title='Title', bio='Bio', url='juan', photoUrl='/images/tendita.png')
+    user2 = User(name='User 2', loginId=2, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 983838393')
+    cart2 = Cart(2)
+    userStore2 = UserStore(name='UserStore 2', regionId=13, userId=2, bio='Bio', url='juan', photoUrl='tendita.png')
 
     login2.save()
-    user2.save() 
+    user2.save()
+    cart2.save()
     userStore2.save()
 
     #Login 3
     login3 = Login(email='pablo@gmail.com', password='1234')
-    user3 = User(name='User 3', loginId=3, photoUrl='/images/juanita.jpg', active=True)
-    userStore3 = UserStore(name='UserStore 3', regionId=13, userId=3, title='Title', bio='Bio', url='pablo', photoUrl='/images/tendita.png')  
+    user3 = User(name='User 3', loginId=3, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23163523k', phone='+56 945838393')
+    cart3 = Cart(3)
+    userStore3 = UserStore(name='UserStore 3', regionId=13, userId=3, bio='Bio', url='pablo', photoUrl='tendita.png')  
 
     login3.save()
     user3.save()
+    cart3.save()
     userStore3.save()
 
     #Login 4
     login4 = Login(email='camila@gmail.com', password='1234')
-    user4 = User(name='User 4', loginId=4, photoUrl='/images/juanita.jpg', active=True)
-    userStore4 = UserStore(name='UserStore 4', regionId=13, userId=4, title='Title', bio='Bio', url='camila', photoUrl='/images/tendita.png')  
+    user4 = User(name='User 4', loginId=4, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23112323k', phone='+56 983818493')
+    cart4 = Cart(4)
+    userStore4 = UserStore(name='UserStore 4', regionId=13, userId=4, bio='Bio', url='camila', photoUrl='tendita.png')  
 
     login4.save()
     user4.save()
+    cart4.save()
     userStore4.save()
 
     # Follows
@@ -862,6 +1301,31 @@ def sitemap():
 
     product4 = Product(name="Product 4", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_0.png", "image_1.png","image_2.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
     product4.save()
+
+
+    cartProduct1 = CartProduct(cart1, price=10000, amount=1, product=product1)
+    cartProduct2 = CartProduct(cart1, price=10000, amount=1, product=product2)
+    cartProduct3 = CartProduct(cart2, price=10000, amount=1, product=product1)
+
+    cartProduct1.save()
+    cartProduct2.save()
+    cartProduct3.save()
+
+    orderStatus1 = OrderStatus(name='Pendiente Pago')
+    orderStatus2 = OrderStatus(name='Pendiente Entrega')
+    orderStatus3 = OrderStatus(name='En evaluacion del pago')
+    orderStatus4 = OrderStatus(name='Entregue')
+
+    orderStatus1.save()
+    orderStatus2.save()
+    orderStatus3.save()
+    orderStatus4.save()
+
+    order1 = Order(user=user1, orderStatus=orderStatus1, region=region1, totalPrice=2000, flete=1000, address='Addresses 1')
+    order1.save()
+ 
+    orderProduct1 = OrderProduct(order=order1, product=product1, price=2000, amount=3)
+    orderProduct1.save()
 
     return 'Tables filled'
 

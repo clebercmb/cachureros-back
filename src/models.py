@@ -7,6 +7,7 @@ import datetime
 
 db = SQLAlchemy()
 
+
 class Login(db.Model):
     __tablename__ = 'Login'
     id = Column(Integer, primary_key=True)
@@ -50,7 +51,6 @@ class Login(db.Model):
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt 
         }  
- 
 
     def save(self):
         db.session.add(self)
@@ -58,14 +58,14 @@ class Login(db.Model):
 
     def update(self):
         self.modifiedAt = datetime.datetime.utcnow()
-        db.session.committ()
+        db.session.commit()
 
     def delete(self):
         db.session.delete(self)
         db.session.commit()
 
     @staticmethod
-    def get_one_login(id):
+    def getOneById(id):
         return Login.query.get(id)
 
     @staticmethod
@@ -78,15 +78,14 @@ class Login(db.Model):
         return login 
 
 
-
 class Follow(db.Model):
     __tablename__ = 'Follow'
 
-    followerId = Column(Integer, ForeignKey('User.id'), primary_key = True )   
-    followedId = Column(Integer, ForeignKey('User.id'), primary_key = True)    
+    followerId = db.Column(Integer, ForeignKey('User.id'), primary_key = True )   
+    followedId = db.Column(Integer, ForeignKey('User.id'), primary_key = True)    
 
-    createdAt = Column(DateTime)
-    modifiedAt  = Column(DateTime)
+    createdAt = db.Column(DateTime)
+    modifiedAt = db.Column(DateTime)
 
     # class constructor
     def __init__(self, follower, followed):
@@ -133,6 +132,107 @@ class Follow(db.Model):
         print('****models.Follower.followers=',followers)
         return followers
 
+# MessageType
+class MessageType(db.Model):
+    __tablename__ = 'MessageType'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), unique=True)
+
+    createdAt = Column(DateTime)
+    modifiedAt  = Column(DateTime)
+
+    # class constructor
+    def __init__(self, name):
+        """
+        Class constructor
+        """
+        self.name = name
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
+    def __rep__(self):
+        return "MessageType %r>" % self.name
+
+    def serialize(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt 
+        } 
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getOneById(id):
+        return MessageType.query.get(id)
+
+    @staticmethod
+    def getAll(userId):
+        messageTypes = MessageType.query.all()
+        return messageTypes
+
+# MessageStatus
+class MessageStatus(db.Model):
+    __tablename__ = 'MessageStatus'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), unique=True)
+
+    createdAt = Column(DateTime)
+    modifiedAt  = Column(DateTime)
+
+    # class constructor
+    def __init__(self, name):
+        """
+        Class constructor
+        """
+        self.name = name
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
+    def __rep__(self):
+        return "MessageStatus %r>" % self.name
+
+    def serialize(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt 
+        } 
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getOneById(id):
+        return MessageStatus.query.get(id)
+
+    @staticmethod
+    def getAll(userId):
+        messageStatus = MessageStatus.query.all()
+        return messageTypes
+
+
 
 class User(db.Model):
     __tablename__ = 'User'
@@ -141,24 +241,28 @@ class User(db.Model):
 
     loginId = Column(Integer, ForeignKey('Login.id'))    
     login = relationship(Login)
-    photoUrl=Column(String(100), default = '/images/tendita.png')
+    photoUrl=Column(String(100), default = 'tendita.png')
 
-    #followedList = db.relationship("Follower", backref="User", lazy=True, uselist=False)
-    #followerList = db.relationship("Follower", backref="User", lazy=True, uselist=False)
-
-    #followedList = relationship("Follower", backref="User", lazy=True, uselist=False, secondary="Follower")
     followeds = db.relationship(Follow, foreign_keys=[Follow.followerId], backref=db.backref('follower', lazy='joined'),lazy='dynamic', cascade='all, delete-orphan')
     
     followers = db.relationship(Follow, foreign_keys=[Follow.followedId], backref=db.backref('followed', lazy='joined'),lazy='dynamic', cascade='all, delete-orphan')
 
+    receivers = db.relationship("UserMessage", foreign_keys="UserMessage.senderId", backref=db.backref('senderUser', lazy='joined'),lazy='subquery', cascade='all, delete-orphan')
+        
+    senders = db.relationship("UserMessage", foreign_keys="UserMessage.receiverId", backref=db.backref('receiverUser', lazy='joined'),lazy='subquery', cascade='all, delete-orphan')
+
+
     userStore = db.relationship("UserStore", backref="User", lazy=True, uselist=False)
 
+    birthDate = db.Column(DateTime)
+    nationalId = db.Column(String(9)) #, unique=True)
+    phone = db.Column(String(20))
     createdAt = db.Column(DateTime)
     modifiedAt  = db.Column(DateTime)
     active = db.Column(Boolean, default=True)
 
     # class constructor
-    def __init__(self, name, loginId, photoUrl, active):
+    def __init__(self, name, loginId, photoUrl, active, birthDate, phone, nationalId):
         """
         Class constructor
         """
@@ -166,6 +270,9 @@ class User(db.Model):
         self.loginId = loginId
         self.photoUrl = photoUrl
         self.active = active
+        self.birthDate = birthDate
+        self.nationalId = nationalId
+        self.phone = phone
         self.createdAt = datetime.datetime.utcnow()
         self.modifiedAt = datetime.datetime.utcnow()
 
@@ -173,24 +280,56 @@ class User(db.Model):
         return "User %r>" % self.name
 
     def serialize(self):
+        birthDate = self.birthDate
+        if birthDate == None:
+            birthDate=''
+        else:
+            birthDate = birthDate.strftime('%d/%m/%Y')
+
+        nationalId = self.nationalId
+        if nationalId == None:
+            nationalId=''
+
+        phone = self.phone
+        if phone == None:
+            phone = ''    
+
         return {
             'id': self.id,
             'name': self.name,
             'login': self.login.serialize(),
             'photoUrl': self.photoUrl,
             'active': self.active,
+            'birthDate': birthDate,
+            'nationalId': nationalId,
+            'phone': phone,
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt
         } 
 
     def serialize_with_userStore(self):
         print('****Login.serialize_with_user:', self.userStore)
+        birthDate = self.birthDate
+        if birthDate == None:
+            birthDate=''
+
+        nationalId = self.nationalId
+        if nationalId == None:
+            nationalId=''
+
+        phone = self.phone
+        if phone == None:
+            phone = '' 
+
         return {
             'id': self.id,
             'name': self.name,
             'login': self.login.serialize(),
             'photoUrl': self.photoUrl,
             'active': self.active,
+            'birthDate': birthDate,
+            'nationalId': nationalId,
+            'phone': phone,
             'userStore': self.userStore.serialize(),
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt
@@ -209,6 +348,29 @@ class User(db.Model):
             'followeds': followeds,
             'followers': followers,
             'active': self.active,
+            'birthDate': self.birthDate,
+            'nationalId': self.nationalId,
+            'phone': self.phone,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt
+        }    
+
+    def serialize_with_userMessages(self):
+        print('****User.serialize_with_userMessages.self.receivers:', self.receivers.all())
+        print('****User.serialize_with_userMessages.self.senders:', self.senders.all())
+        receivers = list(map(lambda receiver: receiver.serialize(), self.receivers.all()))
+        senders = list(map(lambda sender: sender.serialize(), self.senders.all()))
+        return {
+            'id': self.id,
+            'name': self.name,
+            'login': self.login.serialize(),
+            'photoUrl': self.photoUrl,
+            'receivers': receivers,
+            'senders': senders,
+            'active': self.active,
+            'birthDate': self.birthDate,
+            'nationalId': self.nationalId,
+            'phone': self.phone,
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt
         }    
@@ -253,7 +415,7 @@ class User(db.Model):
         return  followers
 
     @staticmethod
-    def getOneBy(id):
+    def getOneById(id):
         return User.query.get(id)
 
     @staticmethod
@@ -276,11 +438,116 @@ class User(db.Model):
 
         return followers  
 
+
+# UserMessage
+class UserMessage(db.Model):
+    __tablename__ = 'UserMessage'
+    id = Column(Integer, primary_key=True)
+    senderId = db.Column(Integer, ForeignKey(User.id), nullable = False)   
+    receiverId = db.Column(Integer, ForeignKey(User.id), nullable = False)    
+    messageTypeId = db.Column(Integer, ForeignKey(MessageType.id), nullable = False)    
+    messageStatusId = db.Column(Integer, ForeignKey(MessageStatus.id), nullable = False)
+
+    messageType = relationship(MessageType, lazy='select')
+    messageStatus = relationship(MessageStatus, lazy='select')
+
+    message = db.Column(String(250), nullable = False)
+    link = db.Column(String(250))
+
+    sender = db.relationship("User", foreign_keys=[senderId])
+    receiver = db.relationship("User", foreign_keys=[receiverId])
+
+
+    createdAt = db.Column(DateTime)
+    modifiedAt  = db.Column(DateTime)
+
+
+    # class constructor
+    def __init__(self, senderId, receiverId, messageTypeId, messageStatusId, message, link):
+        """
+        Class constructor
+        """
+        self.senderId = senderId
+        self.receiverId = receiverId
+        self.messageTypeId = messageTypeId
+        self.messageStatusId = messageStatusId
+        self.message = message
+        self.link = link
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+#        self.sender = db.relationship("User", foreign_keys=[UserMessage.senderId])
+#        self.receiver = db.relationship("User", foreign_keys=[UserMessage.receiverId])
+
+
+    def __rep__(self):
+        return "UserMessage %r>" % self.id
+
+    def serialize(self):
+        createdAt = self.createdAt
+        if createdAt == None:
+            createdAt=''
+        else:
+            createdAt = createdAt.strftime('%d/%m/%Y %H:%M:%S')
+
+        return {
+            'id': self.id,
+            'senderId': self.senderId,
+            'receiverId': self.receiverId,
+            'sender': self.sender.serialize(),
+            'receiver': self.receiver.serialize(),
+            'messageType': self.messageType.serialize(),
+            'messageStatus': self.messageStatus.serialize(),
+            'message': self.message,
+            'link': self.link,
+            'createdAt': createdAt,
+            'modifiedAt': self.modifiedAt             
+        }        
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.committ()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+        
+    @staticmethod
+    def getOneBy(id):
+        return UserMessage.query.get(id)
+
+    @staticmethod
+    def getAllByReceivedId(userId):
+        userMessages = UserMessage.query.filter_by(receiverId=userId).all()
+        return userMessages
+
+    @staticmethod
+    def getAll():
+        userMessages = UserMessage.query.all()
+        return userMessages
+
+
+
 class Region(db.Model):
     __tablename__ = 'Region'
-    id = Column(Integer, primary_key=True)
-    code = Column(String(2), nullable = False)
-    name = Column(String(100), nullable = False)
+    id = db.Column(Integer, primary_key=True)
+    code = db.Column(String(2), nullable = False)
+    name = db.Column(String(100), nullable = False)
+    createdAt = db.Column(DateTime)
+    modifiedAt = db.Column(DateTime)
+
+        # class constructor
+    def __init__(self, name, code):
+        """
+        Class constructor
+        """
+        self.name = name
+        self.code = code
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
 
     def __rep__(self):
         return "Region %r>" % self.name
@@ -289,13 +556,35 @@ class Region(db.Model):
         return {
             'id': self.id,
             'code': self.code,
-            'name': self.name
+            'name': self.name,
+            'createdAt': self.createdAt,
+            'modifiedAt:': self.modifiedAt
         }        
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.committ()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getAllRegions():
+        return Region.query.all()
+
+    @staticmethod
+    def getOneById(id):
+        return Region.query.get(id)
 
 
 class UserStore(db.Model):
     __tablename__ = 'UserStore'
-    id = Column(Integer, primary_key=True)
+    id = db.Column(Integer, primary_key=True)
     name = Column(String(100), nullable = False)
     
     userId = Column(Integer, ForeignKey('User.id'))
@@ -308,7 +597,7 @@ class UserStore(db.Model):
     title = Column(String(100))
     bio = Column(String(200))
     url = Column(String(100))
-    photoUrl = Column(String(100), default = '/images/tendita.png') 
+    photoUrl = Column(String(100), default = 'tendita.png') 
     solds = Column(Integer, default=0)
     sells = Column(Integer, default=0) 
 
@@ -319,14 +608,13 @@ class UserStore(db.Model):
     products = relationship("Product", backref="UserStore", lazy=True)
 
     # class constructor
-    def __init__(self, name, userId, regionId, title, bio, url, photoUrl):
+    def __init__(self, name, userId, regionId, bio, url, photoUrl):
         """
         Class constructor
         """
         self.name = name
         self.userId = userId
         self.regionId = regionId
-        self.title = title
         self.bio = bio
         self.url = url
         self.photoUrl = photoUrl
@@ -340,6 +628,7 @@ class UserStore(db.Model):
         region = ''
         if self.region != None:
             region=self.region.serialize()
+
         return {
             'id': self.id,
             'name': self.name ,
@@ -686,6 +975,20 @@ class Cart(db.Model):
     userId = Column(Integer, ForeignKey('User.id'))
     user = relationship(User)
 
+    products = relationship("CartProduct", backref="Cart", lazy=True)
+
+    createdAt = Column(DateTime)
+    modifiedAt  = Column(DateTime)
+
+    # class constructor
+    def __init__(self, userId):
+        """
+        Class constructor
+        """
+        self.userId = userId
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
     def __rep__(self):
         return "Cart %r>" % self.id
 
@@ -694,6 +997,37 @@ class Cart(db.Model):
             "id": self.id,
             "User": self.user.serialize()
         }   
+
+    def serialize_with_products(self):
+        print('****Cart.serialize_with_product.products:', self.products)
+        products = list(map(lambda product: product.serialize(), self.products))
+
+        return {
+            "id": self.id,
+            "User": self.user.serialize(),
+            'products': products
+        }   
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getOneById(id):
+        return Cart.query.get(id)
+
+    @staticmethod
+    def getAl():
+        return Cart.query.all()
+
 
 class CartProduct(db.Model):
     __tablename__ = 'CartProduct'
@@ -707,6 +1041,21 @@ class CartProduct(db.Model):
     productId = Column(Integer, ForeignKey('Product.id'))
     product = relationship(Product)
 
+    createdAt = Column(DateTime)
+    modifiedAt  = Column(DateTime)
+
+    # class constructor
+    def __init__(self, cart, price, amount, product):
+        """
+        Class constructor
+        """
+        self.cartId = cart.id
+        self.productId = product.id
+        self.price = price
+        self.amount = amount
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
     def __rep__(self):
         return "CartProduct %r>" % self.id
 
@@ -717,8 +1066,8 @@ class CartProduct(db.Model):
             "amount": self.amount,
             "Cart": self.cart.serialize(),
             "Product": self.product.serialize(),
-            'productState': self.productState.serialize(),
-            'weightUnit': self.weightUnit.serialize()
+            "createdAt": self.createdAt,
+            "modifiedAt": self.modifiedAt
         }   
 
     def save(self):
@@ -735,9 +1084,231 @@ class CartProduct(db.Model):
 
     @staticmethod
     def getAll():
-        return Product.query.all()
+        return CartProduct.query.all()
 
     @staticmethod
     def getOneById(id):
-        return Product.query.get(id)
+        return CartProduct.query.get(id)
+
+# Orders
+class OrderStatus(db.Model):
+    __tablename__ = 'OrderStatus'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), unique=True)
+    createdAt = Column(DateTime)
+    modifiedAt  = Column(DateTime)
+
+    # class constructor
+    def __init__(self, name):
+        """
+        Class constructor
+        """
+        self.name = name
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
+    def __rep__(self):
+        return "Login %r>" % self.name
+
+    def serialize(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt 
+        } 
+    def serialize_with_user(self):
+        print('****Login.serialize_with_user:', self.user)
+        return {
+            'id': self.id,
+            'email': self.email,
+            'password': self.password,
+            'user': self.user.serialize(),
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt 
+        }  
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getOneById(id):
+        return Login.query.get(id)
+
+    @staticmethod
+    def get_all_login():
+        return Login.query.all()
+
+    @staticmethod
+    def get_login_by_email(email):
+        login = Login.query.filter_by(email=email).first()
+        return login 
+
+
+class Order(db.Model):
+    __tablename__ = 'Order'
+    id = db.Column(Integer, primary_key=True)
+
+    userId = db.Column(Integer, ForeignKey('User.id'))
+    user = relationship(User, lazy=False)
+
+    orderStatusId = db.Column(Integer, ForeignKey('OrderStatus.id'))
+    orderStatus = relationship(OrderStatus, lazy=False)
+
+    regionId = db.Column(Integer, ForeignKey('Region.id'))
+    region = relationship(Region, lazy=False)
+
+    products = relationship("OrderProduct", backref="Order", lazy=True, cascade='all, delete-orphan')
+    totalPrice = db.Column(Float)
+    flete = db. Column(Float)
+    address = db.Column(String)
+
+    createdAt = db.Column(DateTime)
+    modifiedAt  = db.Column(DateTime)
+
+    # class constructor
+    def __init__(self, user, region, orderStatus, totalPrice, flete, address):
+        """
+        Class constructor
+        """
+        self.userId = user.id
+        self.orderStatusId = orderStatus.id
+        self.regionId = region.id
+        self.totalPrice = totalPrice
+        self.flete = flete
+        self.address = address
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
+    def __rep__(self):
+        return "Order %r>" % self.id
+
+    def serialize(self):
+        return {
+            'id': self.id,
+            'user': self.user.serialize(),
+            'orderStatus': self.orderStatus.serialize(),
+            'region': self.region.serialize(),
+            'totalPrice': self.totalPrice,
+            'flete': self.flete,
+            'address': self.address,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt
+        }   
+
+    def serialize_with_products(self):
+        print('****Order.serialize_with_product.products:', self.products)
+        products = list(map(lambda product: product.serialize(), self.products))
+
+        return {
+            'id': self.id,
+            'user': self.user.serialize(),
+            'orderStatus': self.orderStatus.serialize(),
+            'region': self.region.serialize(),
+            'totalPrice': self.totalPrice,
+            'flete': self.flete,
+            'address': self.address,
+            'products': products,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt
+        }   
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getOneById(id):
+        return Order.query.get(id)
+
+    @staticmethod
+    def getAl():
+        return Order.query.all()
+
+
+class OrderProduct(db.Model):
+    __tablename__ = 'OrderProduct'
+    id = Column(Integer, primary_key=True)
+    orderId = Column(Integer, ForeignKey('Order.id'))
+    order = relationship(Order)
+
+    productId = Column(Integer, ForeignKey('Product.id'))
+    product = relationship(Product)
+
+    price = Column(Float)
+    amount = Column(Integer)
+
+    createdAt = Column(DateTime)
+    modifiedAt  = Column(DateTime)
+
+    # class constructor
+    def __init__(self, order, product, price, amount):
+        """
+        Class constructor
+        """
+        print( ">>>### OrderProdut: order.Id:", order.id ,", product.Id:", product.id,", price:", price, ", amount:", amount)
+
+        #print( "OrderProdut id:", id , ", price:",price,", amount:", amount,", order:", self.order.serialize(), ", Product:", self.product.serialize(), ", createdAt:", self.createdAt, ", modifiedAt:"+ self.modifiedAt)
+        
+        self.orderId = order.id
+        self.productId = product.id
+        self.price = price
+        self.amount = amount
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
+    def __rep__(self):
+        response= "id: " + self.id + ", price:" + self.price + ", amount:"+ self.amount + ", Order:"+ self.order.serialize() + ", Product:"+ self.product.serialize() + ", createdAt:"+ self.createdAt + "modifiedAt:"+ self.modifiedAt
+
+        return "OrderProduct %r>" % response
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "price": self.price,
+            "amount": self.amount,
+            "Order": self.order.serialize(),
+            "Product": self.product.serialize(),
+            "createdAt": self.createdAt,
+            "modifiedAt": self.modifiedAt
+        }   
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getAll():
+        return OrderProduct.query.all()
+
+    @staticmethod
+    def getOneById(id):
+        return OrderProduct.query.get(id)
+
+
 
