@@ -779,7 +779,7 @@ def saveProduct(id=None):
     print('saveProduct.request.form=',request.form)
     print('request.files.len=', len(request.files))
 
-    if not request.form.get("userStoreId"):
+    if id and not request.form.get("userStoreId"):
         return jsonify({"msg":"userStoreId is required"}), 422
 
     if not request.form.get("name"):

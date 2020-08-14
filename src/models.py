@@ -1,8 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Column, ForeignKey, Integer, String, Float, Boolean, event, DateTime
-
+from sqlalchemy import create_engine, desc , Column, ForeignKey, Integer, String, Float, Boolean, event, DateTime
 from sqlalchemy.orm import relationship, backref
-from sqlalchemy import create_engine
 import datetime
 
 db = SQLAlchemy()
@@ -956,7 +954,7 @@ class Product(db.Model):
 
     @staticmethod
     def getAll():
-        return Product.query.all()
+        return Product.query.order_by(desc(Product.createdAt)).all()
 
     @staticmethod
     def getOneById(id):
