@@ -230,8 +230,6 @@ class MessageStatus(db.Model):
         messageStatus = MessageStatus.query.all()
         return messageTypes
 
-
-
 class User(db.Model):
     __tablename__ = 'User'
     id = Column(Integer, primary_key=True)
@@ -251,6 +249,8 @@ class User(db.Model):
 
 
     userStore = db.relationship("UserStore", backref="User", lazy=True, uselist=False)
+    userCart = db.relationship("Cart", backref="User", lazy=True, uselist=False)
+
 
     birthDate = db.Column(DateTime)
     nationalId = db.Column(String(9)) #, unique=True)
@@ -1155,15 +1155,20 @@ class Order(db.Model):
     region = relationship(Region, lazy=False)
 
     products = relationship("OrderProduct", backref="Order", lazy=True, cascade='all, delete-orphan')
+    orderAddress = db.relationship("OrderAddress", backref="Order", lazy=True, uselist=False)
+
+
     totalPrice = db.Column(Float)
-    flete = db. Column(Float)
-    address = db.Column(String)
+    flete = db.Column(Float)
+    address = db.Column(String(100))
+    phone = db.Column(String(15))
+
 
     createdAt = db.Column(DateTime)
     modifiedAt  = db.Column(DateTime)
 
     # class constructor
-    def __init__(self, user, region, orderStatus, totalPrice, flete, address):
+    def __init__(self, user, region, orderStatus, totalPrice, flete, address, phone):
         """
         Class constructor
         """
@@ -1173,6 +1178,7 @@ class Order(db.Model):
         self.totalPrice = totalPrice
         self.flete = flete
         self.address = address
+        self.phone = phone
         self.createdAt = datetime.datetime.utcnow()
         self.modifiedAt = datetime.datetime.utcnow()
 
@@ -1193,6 +1199,8 @@ class Order(db.Model):
             'totalPrice': self.totalPrice,
             'flete': self.flete,
             'address': self.address,
+            'orderAddress': self.orderAddress,
+            'phone': self.phone,
             'createdAt': createdAt,
             'modifiedAt': self.modifiedAt
         }   
@@ -1209,6 +1217,8 @@ class Order(db.Model):
             'totalPrice': self.totalPrice,
             'flete': self.flete,
             'address': self.address,
+            'orderAddress': self.orderAddress,
+            'phone': self.phone,
             'products': products,
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt
@@ -1217,8 +1227,6 @@ class Order(db.Model):
     def save(self):
         db.session.add(self)
         db.session.commit()
-
-
 
     def update(self):
         self.modifiedAt = datetime.datetime.utcnow()
@@ -1236,12 +1244,10 @@ class Order(db.Model):
     def getAl():
         return Order.query.all()
 
-
     @staticmethod
     def getAllByUserId(userId):
         orders = Order.query.filter_by(userId=userId).order_by(Order.createdAt.desc()).all()
         return orders 
-
 
 class OrderProduct(db.Model):
     __tablename__ = 'OrderProduct'
@@ -1331,3 +1337,73 @@ class OrderProduct(db.Model):
         print('>>>getAllByUserStoreId.len(records)=', len(records))
 
         return recordsList
+
+class OrderAddress(db.Model):
+    __tablename__ = 'Address'
+    id = db.Column(Integer, primary_key=True)
+
+    orderId = db.Column(Integer, ForeignKey('Order.id'))
+    order = relationship(Order)
+
+    regionId = db.Column(Integer, ForeignKey('Region.id'))
+    region = relationship(Region)
+
+    name = db.Column(String(50), nullable = False)
+    phone = db.Column(String(50), nullable = False)
+    address = db.Column(String(50), nullable = False)
+    
+    createdAt = Column(DateTime)
+    modifiedAt  = Column(DateTime)
+
+    # class constructor
+    def __init__(self, orderId, regionId, name, phone, address):
+        """
+        Class constructor
+        """
+        self.orderId = orderId
+        self.regionId = regionId
+        self.name = name
+        self.phone = phone
+        self.address = address
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
+
+    def __rep__(self):
+        return "OrderAdress id=%r>" % self.id
+
+    def serialize(self):
+        return {
+            'orderId': orderId,
+            'regionId': regionId,
+            'name': name,
+            'phone': phone,
+            'address': address,
+            'createdAt': createdAt,
+            'modifiedAt': modifiedAt
+        } 
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getOneById(id):
+        return OrderAddress.query.get(id)
+
+    @staticmethod
+    def getAll():
+        return OrderAddress.query.all()
+
+    @staticmethod
+    def getAllByOrderId(orderId):
+        orderAddress = OrderAddress.query.filter_by(orderId=orderId).all()
+        return orderAddress
