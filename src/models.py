@@ -700,8 +700,6 @@ class UserStore(db.Model):
         return userStore    
     
 
-
-
 class Department(db.Model):
     __tablename__ = 'Department'
     id = db.Column(Integer, primary_key=True)
@@ -1142,16 +1140,7 @@ class OrderStatus(db.Model):
 
     @staticmethod
     def getOneById(id):
-        return Login.query.get(id)
-
-    @staticmethod
-    def get_all_login():
-        return Login.query.all()
-
-    @staticmethod
-    def get_login_by_email(email):
-        login = Login.query.filter_by(email=email).first()
-        return login 
+        return OrderStatus.query.get(id)
 
 
 class Order(db.Model):
@@ -1193,6 +1182,11 @@ class Order(db.Model):
         return "Order %r>" % self.id
 
     def serialize(self):
+        createdAt = self.createdAt
+        if createdAt == None:
+            createdAt=''
+        else:
+            createdAt = createdAt.strftime('%d/%m/%Y %H:%M:%S')
         return {
             'id': self.id,
             'user': self.user.serialize(),
@@ -1201,7 +1195,7 @@ class Order(db.Model):
             'totalPrice': self.totalPrice,
             'flete': self.flete,
             'address': self.address,
-            'createdAt': self.createdAt,
+            'createdAt': createdAt,
             'modifiedAt': self.modifiedAt
         }   
 
@@ -1226,6 +1220,8 @@ class Order(db.Model):
         db.session.add(self)
         db.session.commit()
 
+
+
     def update(self):
         self.modifiedAt = datetime.datetime.utcnow()
         db.session.commit()
@@ -1241,6 +1237,12 @@ class Order(db.Model):
     @staticmethod
     def getAl():
         return Order.query.all()
+
+
+    @staticmethod
+    def getAllByUserId(userId):
+        orders = Order.query.filter_by(userId=userId).order_by(Order.createdAt.desc()).all()
+        return orders 
 
 
 class OrderProduct(db.Model):
@@ -1309,3 +1311,25 @@ class OrderProduct(db.Model):
     @staticmethod
     def getOneById(id):
         return OrderProduct.query.get(id)
+
+    @staticmethod
+    def getAllByUserStoreId(userStoreId):  
+        query = db.session.query(Product.id, Product.name, db.func.sum(OrderProduct.amount).label("totalAmount"), db.func.sum(OrderProduct.amount * OrderProduct.price).label("totalPrice")).outerjoin(OrderProduct)
+        query = query.filter(Product.id == OrderProduct.productId)
+        
+        records = query.group_by(Product.id).all()
+
+        recordsList=[]
+        for record in records:
+            recordObject = {
+                "id": record.id,
+                "name": record.name,
+                "totalAmount": record.totalAmount,
+                "totalPrice": record.totalPrice
+            }
+            recordsList.append(recordObject)
+            print('>>record:',record)
+        
+        print('>>>getAllByUserStoreId.len(records)=', len(records))
+
+        return recordsList
