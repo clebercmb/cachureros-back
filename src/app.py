@@ -1085,6 +1085,7 @@ def addOrder():
     products = request.json.get('products', None)
     flete = request.json.get('flete', None)
     address = request.json.get('address', None)
+    phone = request.json.get('phone', None)
 
     if not userId:
         return jsonify({"msg":"userId is required"}), 422
@@ -1100,6 +1101,10 @@ def addOrder():
 
     if not address:
         return jsonify({"msg":"address is required"}), 422
+
+    if not phone:
+        return jsonify({"msg":"phone is required"}), 422
+
 
     user = User.getOneById(userId)
     region = Region.getOneById(regionId)
@@ -1118,7 +1123,7 @@ def addOrder():
     if not orderStatus:
         return jsonify({"msg":"OrderStatus not found"}), 404
 
-    order = Order(user=user, region=region, orderStatus=orderStatus, totalPrice=2000, flete=flete, address=address)
+    order = Order(user=user, region=region, orderStatus=orderStatus, totalPrice=2000, flete=flete, address=address, phone=phone)
 
 
     for orderProduct in products:
@@ -1343,7 +1348,6 @@ def sitemap():
     product4 = Product(name="Product 4", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_0.png", "image_1.png","image_2.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
     product4.save()
 
-
     cartProduct1 = CartProduct(cart1, price=10000, amount=1, product=product1)
     cartProduct2 = CartProduct(cart1, price=10000, amount=1, product=product2)
     cartProduct3 = CartProduct(cart2, price=10000, amount=1, product=product1)
@@ -1362,7 +1366,7 @@ def sitemap():
     orderStatus3.save()
     orderStatus4.save()
 
-    order1 = Order(user=user1, orderStatus=orderStatus1, region=region1, totalPrice=2000, flete=1000, address='Addresses 1')
+    order1 = Order(user=user1, orderStatus=orderStatus1, region=region1, totalPrice=2000, flete=1000, address='Addresses 1', phone='981888996')
     order1.save()
 
     orderProduct1 = OrderProduct(order=order1, product=product1, price=2000, amount=3)
@@ -1373,6 +1377,10 @@ def sitemap():
     userMessage2 =  UserMessage(senderId=1, receiverId=2, messageTypeId=1, messageStatusId=1, message="Message 2", link='Link2')
 
     userMessage3 =  UserMessage(senderId=2, receiverId=3, messageTypeId=1, messageStatusId=1, message="Message 3", link='Link2')
+
+    userMessage1.save()
+    userMessage2.save()
+    userMessage3.save()
 
 
     return 'Tables filled'
