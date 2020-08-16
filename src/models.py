@@ -255,12 +255,13 @@ class User(db.Model):
     birthDate = db.Column(DateTime)
     nationalId = db.Column(String(9)) #, unique=True)
     phone = db.Column(String(20))
+    address = db.Column(String(100))
     createdAt = db.Column(DateTime)
     modifiedAt  = db.Column(DateTime)
     active = db.Column(Boolean, default=True)
 
     # class constructor
-    def __init__(self, name, loginId, photoUrl, active, birthDate, phone, nationalId):
+    def __init__(self, name, loginId, photoUrl, active, birthDate, phone, address, nationalId):
         """
         Class constructor
         """
@@ -271,6 +272,7 @@ class User(db.Model):
         self.birthDate = birthDate
         self.nationalId = nationalId
         self.phone = phone
+        self.address = address
         self.createdAt = datetime.datetime.utcnow()
         self.modifiedAt = datetime.datetime.utcnow()
 
@@ -301,6 +303,7 @@ class User(db.Model):
             'birthDate': birthDate,
             'nationalId': nationalId,
             'phone': phone,
+            'address': self.address,
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt
         } 
@@ -328,6 +331,7 @@ class User(db.Model):
             'birthDate': birthDate,
             'nationalId': nationalId,
             'phone': phone,
+            'address': self.address,
             'userStore': self.userStore.serialize(),
             'createdAt': self.createdAt,
             'modifiedAt': self.modifiedAt
@@ -478,7 +482,8 @@ class UserMessage(db.Model):
 
 
     def __rep__(self):
-        return "UserMessage %r>" % self.id
+        return "UserMessage id={0}, senderId={1}".format(self.id, self.senderId)
+        #return "UserMessage id=%r, senderId=%r, receiverId=%r, message=%r>" % self.id, self.senderId, self.receiverId, self.message
 
     def serialize(self):
         createdAt = self.createdAt
@@ -1140,6 +1145,57 @@ class OrderStatus(db.Model):
     def getOneById(id):
         return OrderStatus.query.get(id)
 
+class PaymentOption(db.Model):
+    __tablename__ = 'PaymentOption'
+    id = db.Column(Integer, primary_key=True)
+    name = db.Column(String(50), unique=True)
+
+    createdAt = db.Column(DateTime)
+    modifiedAt  = db.Column(DateTime)
+
+    # class constructor
+    def __init__(self, name):
+        """
+        Class constructor
+        """
+        self.name = name
+        self.createdAt = datetime.datetime.utcnow()
+        self.modifiedAt = datetime.datetime.utcnow()
+
+
+    def __rep__(self):
+        return "PaymentOption %r>" % self.name
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            'createdAt': self.createdAt,
+            'modifiedAt': self.modifiedAt  
+        }
+
+    def save(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def update(self):
+        self.modifiedAt = datetime.datetime.utcnow()
+        db.session.committ()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    @staticmethod
+    def getAll():
+        payments =PaymentOption.query.all()
+        print('****models.PaymentOption.getAll=',payments)
+        return payments
+
+    @staticmethod
+    def getOneById(id):
+        return PaymentOption.query.get(id)
+
 
 class Order(db.Model):
     __tablename__ = 'Order'
@@ -1157,24 +1213,26 @@ class Order(db.Model):
     products = relationship("OrderProduct", backref="Order", lazy=True, cascade='all, delete-orphan')
     orderAddress = db.relationship("OrderAddress", backref="Order", lazy=True, uselist=False)
 
+    paymentOptionId = db.Column(Integer, ForeignKey('PaymentOption.id'))
+    paymentOption = relationship(PaymentOption, lazy=False)
 
     totalPrice = db.Column(Float)
     flete = db.Column(Float)
     address = db.Column(String(100))
     phone = db.Column(String(15))
 
-
     createdAt = db.Column(DateTime)
     modifiedAt  = db.Column(DateTime)
 
     # class constructor
-    def __init__(self, user, region, orderStatus, totalPrice, flete, address, phone):
+    def __init__(self, user, region, orderStatus, paymentOption, totalPrice, flete, address, phone):
         """
         Class constructor
         """
         self.userId = user.id
         self.orderStatusId = orderStatus.id
         self.regionId = region.id
+        self.paymentOptionId = paymentOption.id
         self.totalPrice = totalPrice
         self.flete = flete
         self.address = address
@@ -1196,6 +1254,7 @@ class Order(db.Model):
             'user': self.user.serialize(),
             'orderStatus': self.orderStatus.serialize(),
             'region': self.region.serialize(),
+            'paymentOption': self.paymentOption.serialize(),
             'totalPrice': self.totalPrice,
             'flete': self.flete,
             'address': self.address,
@@ -1214,6 +1273,7 @@ class Order(db.Model):
             'user': self.user.serialize(),
             'orderStatus': self.orderStatus.serialize(),
             'region': self.region.serialize(),
+            'paymentOption': self.paymentOption.serialize(),
             'totalPrice': self.totalPrice,
             'flete': self.flete,
             'address': self.address,
@@ -1269,7 +1329,7 @@ class OrderProduct(db.Model):
         """
         Class constructor
         """
-        print( ">>>### OrderProdut: order.Id:", order.id ,", product.Id:", product.id,", price:", price, ", amount:", amount)
+        print( ">>>### OrderProduct: order.Id:", order.id ,", product.Id:", product.id,", price:", price, ", amount:", amount)
 
         #print( "OrderProdut id:", id , ", price:",price,", amount:", amount,", order:", self.order.serialize(), ", Product:", self.product.serialize(), ", createdAt:", self.createdAt, ", modifiedAt:"+ self.modifiedAt)
         

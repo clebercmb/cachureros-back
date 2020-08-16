@@ -2,7 +2,7 @@ import os, datetime
 from flask import Flask, request, jsonify, url_for, send_from_directory
 from flask_script import Manager 
 from flask_migrate import Migrate, MigrateCommand
-from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, Cart, CartProduct, WeightUnit, Region, Follow, MessageType, MessageStatus, UserMessage, Order, OrderProduct, OrderStatus
+from models import db, Product, UserStore, Login, User, Department, Category, Size, ProductState, Cart, CartProduct, WeightUnit, Region, Follow, MessageType, MessageStatus, UserMessage, Order, OrderProduct, OrderStatus, PaymentOption
 from flask_cors import CORS
 from utils import APIException, generate_sitemap, allowed_file
 from graphene import ObjectType, String, Schema
@@ -76,7 +76,7 @@ def login():
     return jsonify({"success": "Log In succesfully!", "data": data}), 200
 
 # User Messages
-@app.route("/user-message", methods=['POST'])  
+@app.route("/message", methods=['POST'])  
 def saveUserMessage():
     print('***saveUserMessage***')
     print(request.json)    
@@ -113,7 +113,7 @@ def saveUserMessage():
 
     return jsonify(userMessage.serialize()),201
 
-@app.route("/user-message/<int:id>", methods=['DELETE'])  
+@app.route("/message/<int:id>", methods=['DELETE'])  
 def deleteUserMessage(id):
     print('***deleteUserMessage: id:', id)
     #print(request.json)    
@@ -135,7 +135,7 @@ def deleteUserMessage(id):
 
     return jsonify(userMessagesList),200
 
-@app.route("/user-message/<int:id>", methods=['GET'])  
+@app.route("/message/<int:id>", methods=['GET'])  
 def getUserMessage(id):
     print('***getUserMessage: id:', id)
     print(request.json)    
@@ -150,7 +150,7 @@ def getUserMessage(id):
     return jsonify(userMessage.serialize()),200
 
 
-@app.route("/user-message/", methods=['GET'])  
+@app.route("/message/", methods=['GET'])  
 def getAllUsersMessages():
     print('***getAllUsersMessages')
     print(request.json)    
@@ -164,7 +164,7 @@ def getAllUsersMessages():
     return jsonify(userMessagesList),200
 
 
-@app.route("/user-message/user/<int:id>", methods=['GET'])  
+@app.route("/user/<int:id>/message/", methods=['GET'])  
 def getUserMessageByReceivedId(id):
     print('***getUserMessageByReceivedId: id:', id)
     print(request.json)    
@@ -193,7 +193,7 @@ def register():
     login = Login(email=email, password=password)
     login.save()
 
-    user = User(name=name, loginId=login.id, photoUrl=None, active=True, birthDate=None, nationalId=None, phone=None)
+    user = User(name=name, loginId=login.id, photoUrl=None, active=True, birthDate=None, nationalId=None, phone=None, address=None)
     user.save()
 
     cart = Cart(userId=user.id)
@@ -371,6 +371,7 @@ def saveUserStoreById(id):
     birthDate = request.form.get("birthDate", None)
     nationalId= request.form.get("nationalId", None)
     phone = request.form.get("phone", None)
+    address = request.form.get("address", None)
     userStoreName = request.form.get("userStoreName", None)
     regionId = request.form.get("regionId", None)
     bio = request.form.get("bio", None)
@@ -412,6 +413,9 @@ def saveUserStoreById(id):
 
     if not request.form.get("phone", None):
         return jsonify({"msg":"phone is required"}), 422
+
+    if not request.form.get("address", None):
+        return jsonify({"msg":"address is required"}), 422
 
     if not request.form.get("userStoreName", None):
         return jsonify({"msg":"userStoreName is required"}), 422
@@ -460,8 +464,8 @@ def saveUserStoreById(id):
     user.birthDate = birthDate
     user.nationalId = nationalId
     user.phone = phone
+    user.address = address
     user.photoUrl = userPhotoFileName
-
     userStore.name = userStoreName
     userStore.regionId = regionId
     userStore.bio = bio
@@ -918,11 +922,8 @@ def saveProduct(id=None):
         photosToBeSave = []
         product.update(name=name, price=price, originalPrice=originalPrice, hasBrand=hasBrand, brand=brand, color=color, model=model, weight=weight, flete=flete, qty=qty, photosUrl=hasUpLoadPhotos, departmentId=departmentId, categoryId=categoryId, sizeId=sizeId, productStateId=productStateId, weightUnitId=weightUnitId, userStoreId=userStoreId)
         print('>>>saveProduct.product (after save)=', product)
-        
-
+    
     return jsonify(product.serialize()), 201
-
-
 
 
 @app.route('/images/<filename>')
@@ -1031,6 +1032,27 @@ def addCartProduct(id=None):
 
     return jsonify(cartproduct.serialize()),201
 
+
+# PaymentOption
+@app.route('/payment-option', methods=['GET'])
+def getPaymentOption():
+    print("** getPaymentOption **")
+    paymentOptions = PaymentOption.getAll()
+    paymentOptionsList = list(map( lambda paymentOption: paymentOption.serialize(), paymentOptions ))
+    return jsonify(paymentOptionsList), 200
+
+@app.route('/payment-option/<int:id>', methods=['GET'])
+def getPaymentOptionById(id):
+    print("** getPaymentOption **")
+    paymentOption= PaymentOption.getOneById(id)
+
+    if not paymentOption:
+        return jsonify({"msg":"PaymentOption not found"}), 404
+
+    return jsonify(paymentOption.serialize()), 200
+
+
+
 # Order
 @app.route('/order/<int:id>', methods=['GET'])
 def getOrder(id):
@@ -1086,6 +1108,7 @@ def addOrder():
     flete = request.json.get('flete', None)
     address = request.json.get('address', None)
     phone = request.json.get('phone', None)
+    paymentOptionId = request.json.get('paymentOptionId', None)
 
     if not userId:
         return jsonify({"msg":"userId is required"}), 422
@@ -1105,14 +1128,19 @@ def addOrder():
     if not phone:
         return jsonify({"msg":"phone is required"}), 422
 
+    if not paymentOptionId:
+        return jsonify({"msg":"paymentOptionId is required"}), 422
+
 
     user = User.getOneById(userId)
     region = Region.getOneById(regionId)
     orderStatus = OrderStatus.getOneById(1)
+    paymentOption = PaymentOption.getOneById(paymentOptionId)
 
     print('>>addOrder.user=', user)
     print('>>addOrder.region=', region)
     print('>>addOrder.orderStatus=', orderStatus)
+    print('>>addOrder.paymentOption=', paymentOption)
 
     if not user:
         return jsonify({"msg":"User not found"}), 404
@@ -1123,9 +1151,12 @@ def addOrder():
     if not orderStatus:
         return jsonify({"msg":"OrderStatus not found"}), 404
 
-    order = Order(user=user, region=region, orderStatus=orderStatus, totalPrice=2000, flete=flete, address=address, phone=phone)
+    if not paymentOption:
+        return jsonify({"msg":"PaymentOption not found"}), 404
 
+    order = Order(user=user, region=region, orderStatus=orderStatus, paymentOption=paymentOption, totalPrice=2000, flete=flete, address=address, phone=phone)
 
+    receivers={}
     for orderProduct in products:
         print('>>>orderProduct=', orderProduct)
         product = Product.getOneById(orderProduct['productId'])
@@ -1135,8 +1166,20 @@ def addOrder():
         newProduct = OrderProduct(order=order, product=product, price=orderProduct['price'], amount=orderProduct['amount'])
         order.products.append(newProduct)
 
+        receivers[product.userStore.userId] = product.userStore.userId 
 
     order.save()
+
+    print('>>>receivers:', receivers.keys())
+    for receiver in receivers.keys():
+        messageSender =  UserMessage(senderId=user.id, receiverId=receiver, messageTypeId=3, messageStatusId=1, message="Solicitud de Compra. Pedido numero: "+str(order.id), link=str(order.id))
+        messageSender.save()
+        
+        messageReceiver =  UserMessage(senderId=receiver, receiverId=user.id,messageTypeId=3, messageStatusId=1, message="Solicitud de Compra. Pedido numero: "+str(order.id), link=str(order.id))
+        messageReceiver.save()
+
+        print(">>>UserMessage id={0}, senderId={1}, senderId={2}".format(order.id, user.id, receiver))
+
     return jsonify(order.serialize()),201
 
 # OrderProduct
@@ -1260,8 +1303,11 @@ def sitemap():
     #MessageType
     messageType1 = MessageType(name='duda')
     messageType2 = MessageType(name='oferta')
+    messageType3 = MessageType(name='pedido')
+    
     messageType1.save()
     messageType2.save()
+    messageType3.save()
 
     #MessageStatus
     messageStatus1 = MessageStatus(name='nueva')
@@ -1271,7 +1317,7 @@ def sitemap():
 
     #Login 1
     login1 = Login(email='juanita@gmail.com', password='1234')
-    user1 = User(name='User 1', loginId=1, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 982838393')
+    user1 = User(name='User 1', loginId=1, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 982838393', address='Direccion 1')
     cart1 = Cart(1)
     userStore1 = UserStore(name='UserStore 1', regionId=13, userId=1, bio='Bio', url='juanita', photoUrl='tendita.png')
 
@@ -1282,7 +1328,7 @@ def sitemap():
 
     #Login 2
     login2 = Login(email='juan@gmail.com', password='1234')
-    user2 = User(name='User 2', loginId=2, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 983838393')
+    user2 = User(name='User 2', loginId=2, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 983838393', address='Direccion 2')
     cart2 = Cart(2)
     userStore2 = UserStore(name='UserStore 2', regionId=13, userId=2, bio='Bio', url='juan', photoUrl='tendita.png')
 
@@ -1293,7 +1339,7 @@ def sitemap():
 
     #Login 3
     login3 = Login(email='pablo@gmail.com', password='1234')
-    user3 = User(name='User 3', loginId=3, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23163523k', phone='+56 945838393')
+    user3 = User(name='User 3', loginId=3, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23163523k', phone='+56 945838393', address='Direccion 3')
     cart3 = Cart(3)
     userStore3 = UserStore(name='UserStore 3', regionId=13, userId=3, bio='Bio', url='pablo', photoUrl='tendita.png')  
 
@@ -1304,7 +1350,7 @@ def sitemap():
 
     #Login 4
     login4 = Login(email='camila@gmail.com', password='1234')
-    user4 = User(name='User 4', loginId=4, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23112323k', phone='+56 983818493')
+    user4 = User(name='User 4', loginId=4, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23112323k', phone='+56 983818493', address='Direccion 4')
     cart4 = Cart(4)
     userStore4 = UserStore(name='UserStore 4', regionId=13, userId=4, bio='Bio', url='camila', photoUrl='tendita.png')  
 
@@ -1366,7 +1412,15 @@ def sitemap():
     orderStatus3.save()
     orderStatus4.save()
 
-    order1 = Order(user=user1, orderStatus=orderStatus1, region=region1, totalPrice=2000, flete=1000, address='Addresses 1', phone='981888996')
+    paymentOption1 = PaymentOption(name='TRANSFERENCIA BANCARIA')
+    paymentOption2 = PaymentOption(name='PayPal')
+    paymentOption3 = PaymentOption(name='khipu')
+    paymentOption1.save()
+    paymentOption2.save()
+    paymentOption3.save()
+
+
+    order1 = Order(user=user1, orderStatus=orderStatus1, region=region1, paymentOption=paymentOption1, totalPrice=2000, flete=1000, address='Addresses 1', phone='981888996')
     order1.save()
 
     orderProduct1 = OrderProduct(order=order1, product=product1, price=2000, amount=3)
