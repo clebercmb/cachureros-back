@@ -765,8 +765,8 @@ def getProductsFromUserStore(user_id:None, id:None):
     return  'Hello World:' + str(user_id) + ' ' + str(id)
 
 @app.route('/product/<int:id>', methods=['GET'])
-def getProduct(id=None):
-    print("** request.method===>" +  request.method)
+def getProductById(id=None):
+    print("**.getProductById.request.method===>" +  request.method)
     product = Product.getOneById(id)
     #productsList = list(map( lambda product: product.serialize(), products ))
     if product:
@@ -774,8 +774,17 @@ def getProduct(id=None):
     else:
         return jsonify({"msg":"Product not found"}), 404
 
+@app.route('/product/<string:name>', methods=['GET'])
+def getAllProductsByName(name):
+    print("**getAllProductsByName.request.method===>" +  request.method)
+    products = Product.getAllByName(name)
+    print("***** getAllProductsByName.products===>",  products)
 
-@app.route("/product", methods=["GET", "POST"])
+    productsList = list(map( lambda product: product.serialize(), products ))
+    return jsonify(productsList), 200
+
+
+@app.route("/product", methods=["POST"])
 @app.route("/product/<int:id>", methods=["PUT"])  
 def saveProduct(id=None):
     print('***saveProductt *** => ', request.method)
@@ -1196,8 +1205,7 @@ def getOrderProduct(id):
 def getProductsSold(userStoreId):
     print("***** getOrderProduct **")
     productsSold = OrderProduct.getAllByUserStoreId(userStoreId)
-    print('>>>getProductsSold.productsSold=', productsSold)
-    
+    print('>>>appy.getProductsSold.productsSold=', productsSold)
     #productsSoldList = list(map( lambda product: product.serialize(), productsSold ))
     return jsonify(productsSold), 200
 
@@ -1395,6 +1403,20 @@ def sitemap():
 
     product4 = Product(name="Product 4", price=43000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_0.png", "image_1.png","image_2.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
     product4.save()
+
+    product5 = Product(name="Nike Sapato 5", price=53000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_0.png", "image_1.png","image_2.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
+    product5.save()
+
+    product6 = Product(name="Sapato 6", price=63000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_0.png", "image_1.png","image_2.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
+    product6.save()
+
+    product7 = Product(name="Product 7", price=7000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_1.png", "image_0.png","image_2.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=1)
+    product7.save()
+
+    product8 = Product(name="Product 8", price=7000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_3.png", "image_1.png","image_0.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=1)
+    product8.save()
+
+
 
     cartProduct1 = CartProduct(cart1, price=10000, amount=1, product=product1)
     cartProduct2 = CartProduct(cart1, price=10000, amount=1, product=product2)
