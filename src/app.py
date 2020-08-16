@@ -359,6 +359,10 @@ def saveUserStoreById(id):
 
     print("** appy.saveUserStoreById.id=",id) 
     userStore = UserStore.getOneUserStoreById(id)
+
+    if not userStore:
+        return jsonify({"msg":"UserStore not found"}), 404
+
     print("** appy.saveUserStoreById.userStore=",userStore) 
 
     email = request.form.get("email", None)
@@ -418,28 +422,33 @@ def saveUserStoreById(id):
     if not request.form.get("url", None):
         return jsonify({"msg":"url is required"}), 422
 
-    if hasUserStorePhotoUrl and len(userStorePhotoUrl) == 0:
-        return jsonify({"msg":"userStorePhotoUrl is required"}), 422
 
-
+    userPhotoFileName = ''
     if hasUserPhotoUrl: 
-        print('&&&&&isFileAllowed')
+        print('>>&&&&&-hasUserPhotoUrl')
 
-        if 'userPhoto' not in request.files:
+        if 'userPhotoUrl' not in request.files:
             return jsonify({"msg": "userPhoto is required"}), 400
 
-
-        if not isFileAllowed('userPhotoUrl', userPhotoUrl):
+        file = request.files['userPhotoUrl']
+        print('>>>$$$ filename=', file.filename)
+        if not (file and allowed_file(file.filename, ALLOWED_EXTENSIONS_IMGS)):
             msg = "User photo image {0} not allowed!".format('userPhotoUrl')
             return jsonify({msg}), 400
-        saveImageFile(fileKey='userPhotoUrl', request=request, fileType="UserProfile", email=email)
 
+        userPhotoFileName = saveImageFile(fileKey='userPhotoUrl', request=request, fileType="UserProfile", email=email)
 
+    userStorePhotoFileName=''
     if hasUserStorePhotoUrl:
+        print('>>&&&&&-hasUserStorePhotoUrl')
+
+        if 'userStorePhotoUrl' not in request.files:
+            return jsonify({"msg": "userStorePhotoUrl is required"}), 400
+
         if not isFileAllowed(fileKey='userStorePhotoUrl', request=request):
             msg = "UserStore photo image {0} not allowed!".format('userStorePhotoUrl')
             return jsonify({msg}), 400
-        saveImageFile(fileKey='userStorePhotoUrl', request=request, fileType="UserStore", email=email)
+        userStorePhotoFileName = saveImageFile(fileKey='userStorePhotoUrl', request=request, fileType="UserStore", email=email)
 
     login = Login.getOneById(userStore.user.login.id)
     login.email = email
@@ -451,11 +460,13 @@ def saveUserStoreById(id):
     user.birthDate = birthDate
     user.nationalId = nationalId
     user.phone = phone
+    user.photoUrl = userPhotoFileName
 
     userStore.name = userStoreName
     userStore.regionId = regionId
     userStore.bio = bio
     userStore.url = url
+    userStore.photoUrl = userStorePhotoFileName
 
     userStore.save()
 
@@ -465,7 +476,7 @@ def saveUserStoreById(id):
 
 def isFileAllowed(fileKey, request):
     print('>>>>>>>isFileAllowed.fileKey=', fileKey)
-    print('****isFileAllowed.request.files=', request.files[''])
+    print('****isFileAllowed.request.files=', request.files[fileKey])
     file = request.files[fileKey]
     print('>>>>>>>isFileAllowed.file.filename=', file.filename)
     if not (file and allowed_file(file.filename, ALLOWED_EXTENSIONS_IMGS)):
@@ -474,6 +485,7 @@ def isFileAllowed(fileKey, request):
 
 
 def saveImageFile(fileKey, request, fileType, email):
+    print('>>>saveImageFile=>')
     
     file = request.files[fileKey]
 
@@ -767,7 +779,7 @@ def saveProduct(id=None):
     print('saveProduct.request.form=',request.form)
     print('request.files.len=', len(request.files))
 
-    if not request.form.get("userStoreId"):
+    if id and not request.form.get("userStoreId"):
         return jsonify({"msg":"userStoreId is required"}), 422
 
     if not request.form.get("name"):
@@ -1073,6 +1085,7 @@ def addOrder():
     products = request.json.get('products', None)
     flete = request.json.get('flete', None)
     address = request.json.get('address', None)
+    phone = request.json.get('phone', None)
 
     if not userId:
         return jsonify({"msg":"userId is required"}), 422
@@ -1088,6 +1101,10 @@ def addOrder():
 
     if not address:
         return jsonify({"msg":"address is required"}), 422
+
+    if not phone:
+        return jsonify({"msg":"phone is required"}), 422
+
 
     user = User.getOneById(userId)
     region = Region.getOneById(regionId)
@@ -1106,7 +1123,7 @@ def addOrder():
     if not orderStatus:
         return jsonify({"msg":"OrderStatus not found"}), 404
 
-    order = Order(user=user, region=region, orderStatus=orderStatus, totalPrice=2000, flete=flete, address=address)
+    order = Order(user=user, region=region, orderStatus=orderStatus, totalPrice=2000, flete=flete, address=address, phone=phone)
 
 
     for orderProduct in products:
@@ -1331,7 +1348,6 @@ def sitemap():
     product4 = Product(name="Product 4", price=23000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_0.png", "image_1.png","image_2.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=4)
     product4.save()
 
-
     cartProduct1 = CartProduct(cart1, price=10000, amount=1, product=product1)
     cartProduct2 = CartProduct(cart1, price=10000, amount=1, product=product2)
     cartProduct3 = CartProduct(cart2, price=10000, amount=1, product=product1)
@@ -1350,7 +1366,7 @@ def sitemap():
     orderStatus3.save()
     orderStatus4.save()
 
-    order1 = Order(user=user1, orderStatus=orderStatus1, region=region1, totalPrice=2000, flete=1000, address='Addresses 1')
+    order1 = Order(user=user1, orderStatus=orderStatus1, region=region1, totalPrice=2000, flete=1000, address='Addresses 1', phone='981888996')
     order1.save()
 
     orderProduct1 = OrderProduct(order=order1, product=product1, price=2000, amount=3)
@@ -1361,6 +1377,10 @@ def sitemap():
     userMessage2 =  UserMessage(senderId=1, receiverId=2, messageTypeId=1, messageStatusId=1, message="Message 2", link='Link2')
 
     userMessage3 =  UserMessage(senderId=2, receiverId=3, messageTypeId=1, messageStatusId=1, message="Message 3", link='Link2')
+
+    userMessage1.save()
+    userMessage2.save()
+    userMessage3.save()
 
 
     return 'Tables filled'
