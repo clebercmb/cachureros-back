@@ -1301,7 +1301,7 @@ class Order(db.Model):
         return Order.query.get(id)
 
     @staticmethod
-    def getAl():
+    def getAll():
         return Order.query.all()
 
     @staticmethod
