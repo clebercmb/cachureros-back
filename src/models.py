@@ -962,6 +962,13 @@ class Product(db.Model):
         return Product.query.order_by(desc(Product.createdAt)).all()
 
     @staticmethod
+    def getAllByName(name):
+        products = Product.query.filter_by(name=name).order_by(Product.name).all()
+
+        return products
+
+
+    @staticmethod
     def getOneById(id):
         print('models.Product.getOneById.id=', id)
         product = Product.query.get(id)
@@ -1378,8 +1385,8 @@ class OrderProduct(db.Model):
 
     @staticmethod
     def getAllByUserStoreId(userStoreId):  
-        query = db.session.query(Product.id, Product.name, db.func.sum(OrderProduct.amount).label("totalAmount"), db.func.sum(OrderProduct.amount * OrderProduct.price).label("totalPrice")).outerjoin(OrderProduct)
-        query = query.filter(Product.id == OrderProduct.productId)
+        query = db.session.query(Product.id, Product.name, Product.userStoreId, Product.urlPhoto1, db.func.sum(OrderProduct.amount).label("totalAmount"), db.func.sum(OrderProduct.amount * OrderProduct.price).label("totalPrice")).outerjoin(OrderProduct)
+        query = query.filter(Product.id == OrderProduct.productId, userStoreId == Product.userStoreId)
         
         records = query.group_by(Product.id).all()
 
@@ -1387,14 +1394,16 @@ class OrderProduct(db.Model):
         for record in records:
             recordObject = {
                 "id": record.id,
+                "userStoreId": record.userStoreId,
                 "name": record.name,
+                'urlPhoto': record.urlPhoto1,
                 "totalAmount": record.totalAmount,
                 "totalPrice": record.totalPrice
             }
             recordsList.append(recordObject)
             print('>>record:',record)
         
-        print('>>>getAllByUserStoreId.len(records)=', len(records))
+        print('>>>models.getAllByUserStoreId.len(records)=', len(records))
 
         return recordsList
 
