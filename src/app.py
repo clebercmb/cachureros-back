@@ -193,13 +193,13 @@ def register():
     login = Login(email=email, password=password)
     login.save()
 
-    user = User(name=name, loginId=login.id, photoUrl=None, active=True, birthDate=None, nationalId=None, phone=None, address=None)
+    user = User(name=name, loginId=login.id, photoUrl='user.png', active=True, birthDate=None, nationalId=None, phone=None, address=None)
     user.save()
 
     cart = Cart(userId=user.id)
     cart.save()
 
-    userStore = UserStore(name=name, userId=user.id, regionId=None, bio='', url='', photoUrl=None)
+    userStore = UserStore(name=name, userId=user.id, regionId=None, bio='', url='', photoUrl='tendita.png')
     userStore.save()
     print('login=', login)
 
@@ -427,7 +427,7 @@ def saveUserStoreById(id):
         return jsonify({"msg":"url is required"}), 422
 
 
-    userPhotoFileName = ''
+    userPhotoFileName = userStore.user.photoUrl
     if hasUserPhotoUrl: 
         print('>>&&&&&-hasUserPhotoUrl')
 
@@ -442,7 +442,7 @@ def saveUserStoreById(id):
 
         userPhotoFileName = saveImageFile(fileKey='userPhotoUrl', request=request, fileType="UserProfile", email=email)
 
-    userStorePhotoFileName=''
+    userStorePhotoFileName= userStore.photoUrl
     if hasUserStorePhotoUrl:
         print('>>&&&&&-hasUserStorePhotoUrl')
 
@@ -1317,7 +1317,7 @@ def sitemap():
 
     #Login 1
     login1 = Login(email='juanita@gmail.com', password='1234')
-    user1 = User(name='User 1', loginId=1, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 982838393', address='Direccion 1')
+    user1 = User(name='User 1', loginId=1, photoUrl='user1.png', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 982838393', address='Direccion 1')
     cart1 = Cart(1)
     userStore1 = UserStore(name='UserStore 1', regionId=13, userId=1, bio='Bio', url='juanita', photoUrl='tendita.png')
 
@@ -1328,7 +1328,7 @@ def sitemap():
 
     #Login 2
     login2 = Login(email='juan@gmail.com', password='1234')
-    user2 = User(name='User 2', loginId=2, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 983838393', address='Direccion 2')
+    user2 = User(name='User 2', loginId=2, photoUrl='user2.png', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23167223k', phone='+56 983838393', address='Direccion 2')
     cart2 = Cart(2)
     userStore2 = UserStore(name='UserStore 2', regionId=13, userId=2, bio='Bio', url='juan', photoUrl='tendita.png')
 
@@ -1339,7 +1339,7 @@ def sitemap():
 
     #Login 3
     login3 = Login(email='pablo@gmail.com', password='1234')
-    user3 = User(name='User 3', loginId=3, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23163523k', phone='+56 945838393', address='Direccion 3')
+    user3 = User(name='User 3', loginId=3, photoUrl='user3.png', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23163523k', phone='+56 945838393', address='Direccion 3')
     cart3 = Cart(3)
     userStore3 = UserStore(name='UserStore 3', regionId=13, userId=3, bio='Bio', url='pablo', photoUrl='tendita.png')  
 
@@ -1350,7 +1350,7 @@ def sitemap():
 
     #Login 4
     login4 = Login(email='camila@gmail.com', password='1234')
-    user4 = User(name='User 4', loginId=4, photoUrl='juanita.jpg', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23112323k', phone='+56 983818493', address='Direccion 4')
+    user4 = User(name='User 4', loginId=4, photoUrl='user4.png', active=True, birthDate=datetime.datetime.utcnow(), nationalId='23112323k', phone='+56 983818493', address='Direccion 4')
     cart4 = Cart(4)
     userStore4 = UserStore(name='UserStore 4', regionId=13, userId=4, bio='Bio', url='camila', photoUrl='tendita.png')  
 
