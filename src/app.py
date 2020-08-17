@@ -1416,6 +1416,15 @@ def sitemap():
     product8 = Product(name="Product 8", price=7000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_3.png", "image_1.png","image_0.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=1)
     product8.save()
 
+    product9 = Product(name="Product 9", price=7000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_3.png", "image_1.png","image_0.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=1)
+    product9.save()
+
+    product10 = Product(name="Product 10", price=7000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_3.png", "image_1.png","image_0.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=1)
+    product10.save()
+
+    product11 = Product(name="Product 11", price=7000.00, originalPrice=40000.00, hasBrand=False,brand="Ruko", color="Verde Amerillo", model="Deportiva", weight=1, flete=10, qty=1, photosUrl=["image_3.png", "image_1.png","image_0.png","image_3.png","image_4.png"],departmentId=1,categoryId=1, sizeId=1, productStateId=1, weightUnitId=1, userStoreId=1)
+    product11.save()
+
 
 
     cartProduct1 = CartProduct(cart1, price=10000, amount=1, product=product1)
