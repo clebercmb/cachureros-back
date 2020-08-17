@@ -1183,13 +1183,14 @@ def addOrder():
 
     print('>>>receivers:', receivers.keys())
     for receiver in receivers.keys():
-        messageSender =  UserMessage(senderId=user.id, receiverId=receiver, messageTypeId=3, messageStatusId=1, message="Solicitud de Compra. Pedido numero: "+str(order.id), link=str(order.id))
+        messageSender =  UserMessage(senderId=user.id, receiverId=receiver, messageTypeId=4, messageStatusId=1, message="Pedido numero: "+str(order.id), link=str(order.id))
         messageSender.save()
         
-        messageReceiver =  UserMessage(senderId=receiver, receiverId=user.id,messageTypeId=3, messageStatusId=1, message="Solicitud de Compra. Pedido numero: "+str(order.id), link=str(order.id))
+        messageReceiver =  UserMessage(senderId=receiver, receiverId=user.id,messageTypeId=3, messageStatusId=1, message="Pedido numero: "+str(order.id), link=str(order.id))
         messageReceiver.save()
 
         print(">>>UserMessage id={0}, senderId={1}, senderId={2}".format(order.id, user.id, receiver))
+
 
     return jsonify(order.serialize()),201
 
@@ -1201,13 +1202,48 @@ def getOrderProduct(id):
     return jsonify(orderProduct.serialize()), 200
 
 
-@app.route('/user-store/<int:userStoreId>/sells', methods=['GET'])
+@app.route('/user-store/<int:userStoreId>/sells-by-product', methods=['GET'])
 def getProductsSold(userStoreId):
     print("***** getOrderProduct **")
     productsSold = OrderProduct.getAllByUserStoreId(userStoreId)
     print('>>>appy.getProductsSold.productsSold=', productsSold)
     #productsSoldList = list(map( lambda product: product.serialize(), productsSold ))
     return jsonify(productsSold), 200
+
+
+@app.route('/user-store/<int:id>/product-order', methods=['GET'])
+def getSellByUserStore(id):
+    print("***** getSellByUserStore **")
+    productsSold = OrderProduct.getProductOrderByUserStoreId(id)
+    print('>>>appy.getSellByUserStore.productsSold=', productsSold)
+    #productsSoldList = list(map( lambda product: product.serialize(), productsSold ))
+    return jsonify(productsSold), 200
+
+@app.route('/user-store/<int:userStoreId>/sell/<int:orderId>/product-order/', methods=['GET'])
+def getSellByUserStoreAndOrder(userStoreId,orderId):
+    print("***** getSellByUserStoreAndOrder **")
+    productsSold = OrderProduct.getProductOrderByUserStoreIdAndOrderId(userStoreId, orderId)
+    print('>>>appy.getSellByUserStoreAndOrder.productsSold=', productsSold)
+    #productsSoldList = list(map( lambda product: product.serialize(), productsSold ))
+    return jsonify(productsSold), 200
+
+@app.route('/user-store/<int:userStoreId>/sell', methods=['GET'])
+def getOrderByUserStore(userStoreId):
+    print("***** getOrderByUserStore **")
+    productsSold = OrderProduct.getOrderByUserStore(userStoreId)
+    print('>>>appy.getOrderByUserStore.productsSold=', productsSold)
+    #productsSoldList = list(map( lambda product: product.serialize(), productsSold ))
+    return jsonify(productsSold), 200
+
+@app.route('/user-store/<int:userStoreId>/sell/<int:orderId>', methods=['GET'])
+def getOrderByUserStoreAndOrder(userStoreId, orderId):
+    print("***** getOrderByUserStoreAndOrder **")
+    productsSold = OrderProduct.getOrderByUserStoreAndOrderId(userStoreId, orderId)
+    print('>>>appy.getOrderByUserStoreAndOrder.productsSold=', productsSold)
+    #productsSoldList = list(map( lambda product: product.serialize(), productsSold ))
+    return jsonify(productsSold), 200
+
+
 
 @app.route("/order-product/<int:id>", methods=['PUT'])  
 @app.route("/order-product/", methods=['POST'])  
@@ -1250,12 +1286,14 @@ def addOrderProduct(id=None):
             return jsonify({"msg":"OrderProduct not found"}), 404
         orderproduct.price = price
         orderproduct.amount = amount
+        orderproduct.flete = product.flete
         orderproduct.update()
     else:        
         orderproduct = OrderProduct(order=order, price=price, amount=amount, product=product)
         orderproduct.save()
 
     return jsonify(orderproduct.serialize()),201
+
 
 
 # generate sitemap with all your endpoints
@@ -1313,11 +1351,13 @@ def sitemap():
     #MessageType
     messageType1 = MessageType(name='duda')
     messageType2 = MessageType(name='oferta')
-    messageType3 = MessageType(name='pedido')
+    messageType3 = MessageType(name='compra')
+    messageType4 = MessageType(name='venta')
     
     messageType1.save()
     messageType2.save()
     messageType3.save()
+    messageType4.save()
 
     #MessageStatus
     messageStatus1 = MessageStatus(name='nueva')
@@ -1435,15 +1475,18 @@ def sitemap():
     cartProduct2.save()
     cartProduct3.save()
 
-    orderStatus1 = OrderStatus(name='Pendiente Pago')
-    orderStatus2 = OrderStatus(name='Pendiente Entrega')
-    orderStatus3 = OrderStatus(name='En evaluacion del pago')
-    orderStatus4 = OrderStatus(name='Entregue')
+    orderStatus1 = OrderStatus(name='Espera del Pago')
+    orderStatus2 = OrderStatus(name='Espera del Envio')
+    orderStatus3 = OrderStatus(name='Evaluación del pago')
+    orderStatus4 = OrderStatus(name='Enviado')
+    orderStatus5 = OrderStatus(name='Entregue')
+
 
     orderStatus1.save()
     orderStatus2.save()
     orderStatus3.save()
     orderStatus4.save()
+    orderStatus5.save()
 
     paymentOption1 = PaymentOption(name='TRANSFERENCIA BANCARIA')
     paymentOption2 = PaymentOption(name='PayPal')

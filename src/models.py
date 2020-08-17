@@ -1316,17 +1316,19 @@ class Order(db.Model):
         orders = Order.query.filter_by(userId=userId).order_by(Order.createdAt.desc()).all()
         return orders 
 
+
 class OrderProduct(db.Model):
     __tablename__ = 'OrderProduct'
-    id = Column(Integer, primary_key=True)
-    orderId = Column(Integer, ForeignKey('Order.id'))
-    order = relationship(Order)
+    id = db.Column(Integer, primary_key=True)
+    orderId = db.Column(Integer, ForeignKey('Order.id'))
+    order = db.relationship(Order)
 
-    productId = Column(Integer, ForeignKey('Product.id'))
-    product = relationship(Product)
+    productId = db.Column(Integer, ForeignKey('Product.id'))
+    product = db.relationship(Product)
 
-    price = Column(Float)
-    amount = Column(Integer)
+    flete= db.Column(Float)
+    price = db.Column(Float)
+    amount = db.Column(Integer)
 
     createdAt = Column(DateTime)
     modifiedAt  = Column(DateTime)
@@ -1336,19 +1338,20 @@ class OrderProduct(db.Model):
         """
         Class constructor
         """
-        print( ">>>### OrderProduct: order.Id:", order.id ,", product.Id:", product.id,", price:", price, ", amount:", amount)
+        print( ">>>### OrderProduct: order.Id:", order.id ,", product.Id:", product.id,", price:", price, ", amount:", amount, 'flete:', product.flete)
 
         #print( "OrderProdut id:", id , ", price:",price,", amount:", amount,", order:", self.order.serialize(), ", Product:", self.product.serialize(), ", createdAt:", self.createdAt, ", modifiedAt:"+ self.modifiedAt)
         
         self.orderId = order.id
         self.productId = product.id
         self.price = price
+        self.flete = product.flete
         self.amount = amount
         self.createdAt = datetime.datetime.utcnow()
         self.modifiedAt = datetime.datetime.utcnow()
 
     def __rep__(self):
-        response= "id: " + self.id + ", price:" + self.price + ", amount:"+ self.amount + ", Order:"+ self.order.serialize() + ", Product:"+ self.product.serialize() + ", createdAt:"+ self.createdAt + "modifiedAt:"+ self.modifiedAt
+        response= "id: " + self.id + ", price:" + self.price + ", amount:"+ self.amount + ", flete:" + self.flete + ", Order:"+ self.order.serialize() + ", Product:"+ self.product.serialize() + ", createdAt:"+ self.createdAt + "modifiedAt:"+ self.modifiedAt
 
         return "OrderProduct %r>" % response
 
@@ -1357,6 +1360,7 @@ class OrderProduct(db.Model):
             "id": self.id,
             "price": self.price,
             "amount": self.amount,
+            "flete": self.flete,
             "Order": self.order.serialize(),
             "Product": self.product.serialize(),
             "createdAt": self.createdAt,
@@ -1385,7 +1389,7 @@ class OrderProduct(db.Model):
 
     @staticmethod
     def getAllByUserStoreId(userStoreId):  
-        query = db.session.query(Product.id, Product.name, Product.userStoreId, Product.urlPhoto1, db.func.sum(OrderProduct.amount).label("totalAmount"), db.func.sum(OrderProduct.amount * OrderProduct.price).label("totalPrice")).outerjoin(OrderProduct)
+        query = db.session.query(Product.id, Product.name, Product.userStoreId, Product.urlPhoto1, db.func.sum(OrderProduct.amount).label("totalAmount"), db.func.sum(OrderProduct.amount * OrderProduct.price).label("totalPrice"), db.func.sum(OrderProduct.amount * OrderProduct.flete).label("totalFlete")).outerjoin(OrderProduct)
         query = query.filter(Product.id == OrderProduct.productId, userStoreId == Product.userStoreId)
         
         records = query.group_by(Product.id).all()
@@ -1398,14 +1402,166 @@ class OrderProduct(db.Model):
                 "name": record.name,
                 'urlPhoto': record.urlPhoto1,
                 "totalAmount": record.totalAmount,
+                "totalPrice": record.totalPrice,
+                "totalFlete": record.totalFlete
+            }
+            recordsList.append(recordObject)
+            print('>>record:',record)
+        
+        print('>>>OrderProduct.getAllByUserStoreId.len(records)=', len(records))
+
+        return recordsList
+
+    @staticmethod
+    def getProductOrderByUserStoreId(userStoreId):
+        query = db.session.query(Product.id, Product.name, Product.userStoreId, Product.urlPhoto1, OrderProduct.orderId, OrderProduct.amount, OrderProduct.price, OrderProduct.createdAt).outerjoin(OrderProduct)
+        
+        query = query.filter(Product.id == OrderProduct.productId, userStoreId == Product.userStoreId)
+        
+        records = query.order_by(desc(OrderProduct.createdAt)).all()
+
+        recordsList=[]
+        for record in records:
+            recordObject = {
+                "id": record.id,
+                "orderId": record.orderId,
+                "userStoreId": record.userStoreId,
+                "name": record.name,
+                'urlPhoto': record.urlPhoto1,
+                "amount": record.amount,
+                "price": record.price,
+                "createdAt": record.createdAt
+            }
+            recordsList.append(recordObject)
+            print('>>record:',record)
+        
+        print('>>>models.OrdergetProductOrderByUserStoreId.len(records)=', len(records))
+
+        return recordsList
+
+    @staticmethod
+    def getProductOrderByUserStoreIdAndOrderId(userStoreId, orderId):
+        query = db.session.query(Product.id, Product.name, Product.userStoreId, Product.urlPhoto1, OrderProduct.orderId, OrderProduct.amount, OrderProduct.flete, OrderProduct.price, OrderProduct.createdAt).outerjoin(OrderProduct)
+        
+        query = query.filter(Product.id == OrderProduct.productId, userStoreId == Product.userStoreId, OrderProduct.orderId == orderId)
+        
+        records = query.order_by(desc(OrderProduct.createdAt)).all()
+
+        recordsList=[]
+        for record in records:
+            recordObject = {
+                "id": record.id,
+                "orderId": record.orderId,
+                "userStoreId": record.userStoreId,
+                "name": record.name,
+                'urlPhoto': record.urlPhoto1,
+                "amount": record.amount,
+                "flete": record.flete,
+                "price": record.price,
+                "createdAt": record.createdAt
+            }
+            recordsList.append(recordObject)
+            print('>>record:',record)
+        
+        print('>>>models.OrdergetProductOrderByUserStoreId.len(records)=', len(records))
+
+        return recordsList
+
+    @staticmethod
+    def getOrderByUserStore(userStoreId):
+
+        query = db.session.query(
+                Order.id, Order.userId, User.name, User.photoUrl, Order.orderStatusId, Order.regionId, Order.paymentOptionId, Order.address, Order.phone, Order.createdAt, db.func.sum(OrderProduct.amount).label("totalAmount"), db.func.sum(OrderProduct.amount * OrderProduct.price).label("totalPrice")
+            ).filter(
+                User.id == Order.userId,
+            ).filter(
+                Order.id == OrderProduct.orderId,
+            ).filter(
+                OrderProduct.productId == Product.id,            
+            ).filter(
+                Region.id == Order.regionId,            
+            ).filter(
+                Product.userStoreId == userStoreId
+            )
+        
+        query = query.group_by(Order.id)
+
+        records = query.order_by(desc(Order.createdAt)).all()
+
+        recordsList=[]
+        for record in records:
+            recordObject = {
+                "orderId": record.id,
+                "userId": record.userId,
+                "userName": record.name,
+                "photoUrl": record.photoUrl,
+                "orderStatusId": record.orderStatusId,
+                "regionId": record.regionId,
+                "paymentOptionId" : record.paymentOptionId,
+                "address": record.address,
+                "phone": record.phone,
+                "createdAt": record.createdAt.strftime('%d/%m/%Y %H:%M:%S'),
+                "totalAmount": record.totalAmount,
                 "totalPrice": record.totalPrice
             }
             recordsList.append(recordObject)
             print('>>record:',record)
         
-        print('>>>models.getAllByUserStoreId.len(records)=', len(records))
+        print('>>>OrderProduct.getAllByUserStoreId.len(records)=', len(records))
 
         return recordsList
+
+    @staticmethod
+    def getOrderByUserStoreAndOrderId(userStoreId, orderId):
+
+        query = db.session.query(
+                Order.id, Order.userId, User.name, User.photoUrl, Order.orderStatusId, Order.regionId, Order.paymentOptionId, Order.address, Order.phone, Order.createdAt, db.func.sum(OrderProduct.amount).label("totalAmount"), db.func.sum(OrderProduct.amount * OrderProduct.price).label("totalPrice")
+            ).filter(
+                User.id == Order.userId,
+            ).filter(
+                Order.id == OrderProduct.orderId,
+            ).filter(
+                OrderProduct.productId == Product.id,            
+            ).filter(
+                Region.id == Order.regionId,            
+            ).filter(
+                Product.userStoreId == userStoreId
+            ).filter(
+                Order.id == orderId
+            )
+        
+        query = query.group_by(Order.id)
+
+        records = query.order_by(desc(Order.createdAt)).all()
+
+        recordsList=[]
+        for record in records:
+            recordObject = {
+                "orderId": record.id,
+                "userId": record.userId,
+                "userName": record.name,
+                "photoUrl": record.photoUrl,
+                "orderStatusId": record.orderStatusId,
+                "regionId": record.regionId,
+                "paymentOptionId" : record.paymentOptionId,
+                "address": record.address,
+                "phone": record.phone,
+                "createdAt": record.createdAt.strftime('%d/%m/%Y %H:%M:%S'),
+                "totalAmount": record.totalAmount,
+                "totalPrice": record.totalPrice
+            }
+            recordsList.append(recordObject)
+            print('>>record:',record)
+        
+        print('>>>OrderProduct.getAllByUserStoreId.len(records)=', len(records))
+
+        return recordsList
+
+
+
+
+
+
 
 class OrderAddress(db.Model):
     __tablename__ = 'Address'
