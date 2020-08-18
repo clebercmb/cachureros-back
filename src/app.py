@@ -1356,11 +1356,13 @@ def sitemap():
     messageType2 = MessageType(name='oferta')
     messageType3 = MessageType(name='compra')
     messageType4 = MessageType(name='venta')
+    messageType5 = MessageType(name='respuesta')
     
     messageType1.save()
     messageType2.save()
     messageType3.save()
     messageType4.save()
+    messageType5.save()
 
     #MessageStatus
     messageStatus1 = MessageStatus(name='nueva')
