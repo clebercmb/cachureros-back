@@ -1515,7 +1515,7 @@ class OrderProduct(db.Model):
     def getOrderByUserStoreAndOrderId(userStoreId, orderId):
 
         query = db.session.query(
-                Order.id, Order.userId, User.name, User.photoUrl, Order.orderStatusId, Order.regionId, Order.paymentOptionId, Order.address, Order.phone, Order.createdAt, db.func.sum(OrderProduct.amount).label("totalAmount"), db.func.sum(OrderProduct.amount * OrderProduct.price).label("totalPrice")
+                Order.id, Order.userId, User.name, User.photoUrl, Order.orderStatusId, Order.regionId, Region.name.label("regionName"), Order.paymentOptionId, PaymentOption.name.label("paymentOption"), Order.address, Order.phone, Order.createdAt, db.func.sum(OrderProduct.amount).label("totalAmount"), db.func.sum(OrderProduct.amount * OrderProduct.price).label("totalPrice")
             ).filter(
                 User.id == Order.userId,
             ).filter(
@@ -1526,6 +1526,8 @@ class OrderProduct(db.Model):
                 Region.id == Order.regionId,            
             ).filter(
                 Product.userStoreId == userStoreId
+            ).filter(
+                PaymentOption.id == Order.paymentOptionId
             ).filter(
                 Order.id == orderId
             )
@@ -1543,6 +1545,8 @@ class OrderProduct(db.Model):
                 "photoUrl": record.photoUrl,
                 "orderStatusId": record.orderStatusId,
                 "regionId": record.regionId,
+                "region": record.regionName,
+                "paymentOption": record.paymentOption,
                 "paymentOptionId" : record.paymentOptionId,
                 "address": record.address,
                 "phone": record.phone,
@@ -1555,8 +1559,10 @@ class OrderProduct(db.Model):
         
         print('>>>OrderProduct.getAllByUserStoreId.len(records)=', len(records))
 
-        return recordsList
-
+        if len(records) > 0:  
+            return recordsList[0]
+        else:
+            return None
 
 
 
