@@ -524,7 +524,7 @@ class UserMessage(db.Model):
 
     @staticmethod
     def getAllByReceivedId(userId):
-        userMessages = UserMessage.query.filter_by(receiverId=userId).all()
+        userMessages = UserMessage.query.filter_by(receiverId=userId).order_by(desc(UserMessage.createdAt)).all()
         return userMessages
 
     @staticmethod
