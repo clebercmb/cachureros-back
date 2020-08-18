@@ -1240,8 +1240,11 @@ def getOrderByUserStoreAndOrder(userStoreId, orderId):
     print("***** getOrderByUserStoreAndOrder **")
     productsSold = OrderProduct.getOrderByUserStoreAndOrderId(userStoreId, orderId)
     print('>>>appy.getOrderByUserStoreAndOrder.productsSold=', productsSold)
-    #productsSoldList = list(map( lambda product: product.serialize(), productsSold ))
-    return jsonify(productsSold), 200
+
+    if not productsSold:
+        return jsonify({"msg":"Order not found"}), 404
+    else:
+        return jsonify(productsSold), 200
 
 
 
